@@ -1,0 +1,73 @@
+<article class="match-card" [ngClass]="{ expanded, final: match.final }">
+  <header class="match-summary">
+    <div>
+      <span class="match-number">Match {{ index + 1 }}</span>
+      <h3>{{ teamName(match.teamASeed) }} vs {{ teamName(match.teamBSeed) }}</h3>
+    </div>
+    <div class="work-cell">
+      <span>Work Team: {{ teamName(match.refSeed) }}</span>
+      <button type="button" class="score-toggle" (click)="toggleExpanded()">
+        {{ expanded ? 'Hide' : 'Keep Score' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="score-table">
+    <div class="score-table-header">
+      <span>Team</span>
+      @for (game of match.games; track $index) {
+        <span>Set {{ $index + 1 }}</span>
+      }
+    </div>
+    <div class="score-table-row">
+      <strong>{{ teamName(match.teamASeed) }}</strong>
+      @for (game of match.games; track $index) {
+        <span>{{ game.scoreA }}</span>
+      }
+    </div>
+    <div class="score-table-row">
+      <strong>{{ teamName(match.teamBSeed) }}</strong>
+      @for (game of match.games; track $index) {
+        <span>{{ game.scoreB }}</span>
+      }
+    </div>
+  </div>
+
+  @if (expanded) {
+    <section class="expanded-scoring">
+      @for (game of match.games; track $index; let gameIndex = $index) {
+        <div class="game-panel">
+          <h4>Set {{ gameIndex + 1 }} to {{ targetScore }}</h4>
+          <div class="score-controls">
+            <div>
+              <label>{{ teamName(match.teamASeed) }}</label>
+              <input type="number" min="0" [(ngModel)]="game.scoreA" (ngModelChange)="normalizeScore(game, 'A')" [disabled]="match.final" />
+              <div>
+                <button type="button" (click)="updateScore(game, 'A', -1)" [disabled]="match.final">-1</button>
+                <button type="button" (click)="updateScore(game, 'A', 1)" [disabled]="match.final">+1</button>
+              </div>
+            </div>
+            <div>
+              <label>{{ teamName(match.teamBSeed) }}</label>
+              <input type="number" min="0" [(ngModel)]="game.scoreB" (ngModelChange)="normalizeScore(game, 'B')" [disabled]="match.final" />
+              <div>
+                <button type="button" (click)="updateScore(game, 'B', -1)" [disabled]="match.final">-1</button>
+                <button type="button" (click)="updateScore(game, 'B', 1)" [disabled]="match.final">+1</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+      <div class="row-actions">
+        @if (match.final) {
+          <button type="button" class="secondary" (click)="reopen()">Reopen</button>
+        } @else {
+          <button type="button" (click)="markFinal()">Mark final</button>
+        }
+        <button type="button" class="secondary" (click)="movedUp.emit()" [disabled]="first">Move up</button>
+        <button type="button" class="secondary" (click)="movedDown.emit()" [disabled]="last">Move down</button>
+        <button type="button" class="danger" (click)="removed.emit()">Remove</button>
+      </div>
+    </section>
+  }
+</article>
