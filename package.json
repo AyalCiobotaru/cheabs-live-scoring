@@ -6,6 +6,7 @@
   "scripts": {
     "build": "npm --prefix frontend run build",
     "start:api": "node --env-file=.env server/local-server.mjs",
+    "start:api:debug": "node --inspect-brk=9229 --env-file=.env ./server/local-server.mjs",
     "vercel-build": "npm --prefix frontend run build"
   },
   "engines": {

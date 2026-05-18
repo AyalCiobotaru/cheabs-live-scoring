@@ -28,7 +28,8 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "allowedCommonJsDependencies": [
-              "ably"
+              "ably",
+              "tesseract.js"
             ],
             "assets": [
               "src/favicon.ico",

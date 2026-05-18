@@ -35,6 +35,9 @@
         <button type="button" class="secondary" (click)="scanPoolSheet()" [disabled]="!pool.imagePreview || scanStatus === 'scanning'">
           {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
         </button>
+        @if (scanStatus === 'scanning' && scanProgress) {
+          <p class="scan-progress">{{ scanProgress }}</p>
+        }
         @if (scanStatus === 'success' && scanSummary) {
           <section class="scan-summary">
             <h3>Pool Sheet Read</h3>

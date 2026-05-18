@@ -176,13 +176,18 @@ button:disabled {
   justify-content: center;
 }
 
-.scan-error {
+.scan-error,
+.scan-progress {
   font-size: 13px;
   font-weight: 700;
 }
 
 .scan-error {
   color: #9c2e2e;
+}
+
+.scan-progress {
+  color: #325b75;
 }
 
 .scan-summary {

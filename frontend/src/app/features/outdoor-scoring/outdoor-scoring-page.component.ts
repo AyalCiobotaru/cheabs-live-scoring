@@ -11,6 +11,7 @@ import {
 } from './outdoor-scoring.models';
 import { OutdoorMatchRowComponent } from './outdoor-match-row/outdoor-match-row.component';
 import { OutdoorScoringRealtimeService } from './outdoor-scoring-realtime.service';
+import { OutdoorSheetScannerService } from './outdoor-sheet-scanner.service';
 
 const STORAGE_KEY = 'cheabs.liveScoring.pool.v1';
 const TEAM_COUNT_OPTIONS = [3, 4, 5, 6, 7];
@@ -61,6 +62,7 @@ export class OutdoorScoringPageComponent implements OnInit, OnDestroy {
   editingSetup = !this.hadSavedPool || this.pool.matches.length === 0;
   expandedMatchId: string | null = null;
   scanError = '';
+  scanProgress = '';
   scanSummary: { read: string[]; assumed: string[]; manual: string[] } | null = null;
   scanStatus: 'idle' | 'scanning' | 'success' | 'failed' = 'idle';
   readonly teamCountOptions = TEAM_COUNT_OPTIONS;
@@ -69,7 +71,8 @@ export class OutdoorScoringPageComponent implements OnInit, OnDestroy {
   constructor(
     private readonly changeDetector: ChangeDetectorRef,
     private readonly zone: NgZone,
-    private readonly realtime: OutdoorScoringRealtimeService
+    private readonly realtime: OutdoorScoringRealtimeService,
+    private readonly scanner: OutdoorSheetScannerService
   ) {}
 
   ngOnInit(): void {
@@ -143,34 +146,29 @@ export class OutdoorScoringPageComponent implements OnInit, OnDestroy {
 
     this.scanStatus = 'scanning';
     this.scanError = '';
+    this.scanProgress = 'Preparing OCR...';
     this.scheduleRender();
 
     try {
-      const response = await fetch('/api/outdoor-scoring/scan-sheet', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          imageDataUrl: this.pool.imagePreview
-        })
+      const body = await this.scanner.scan(this.pool.imagePreview, (progress) => {
+        this.zone.run(() => {
+          this.scanProgress = this.formatScanProgress(progress.status, progress.progress);
+          this.scheduleRender();
+        });
       });
-      const body = await response.json() as OutdoorSheetScanResult & { error?: string; message?: string };
-
-      if (!response.ok) {
-        throw new Error(body.message || body.error || 'Unable to read the Pool Sheet photo.');
-      }
 
       this.zone.run(() => {
         this.applySheetScan(body);
         this.scanSummary = this.buildScanSummary(body);
         this.scanStatus = 'success';
+        this.scanProgress = '';
         this.editingSetup = true;
         this.scheduleRender();
       });
     } catch (error) {
       this.zone.run(() => {
         this.scanStatus = 'failed';
+        this.scanProgress = '';
         this.scanError = error instanceof Error ? error.message : 'Unable to read the Pool Sheet photo.';
         this.scheduleRender();
       });
@@ -465,7 +463,8 @@ export class OutdoorScoringPageComponent implements OnInit, OnDestroy {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext('2d')?.drawImage(image, 0, 0, width, height);
+        const context = canvas.getContext('2d');
+        context?.drawImage(image, 0, 0, width, height);
         resolve(canvas.toDataURL('image/jpeg', 0.86));
       };
       image.onerror = () => {
@@ -483,6 +482,15 @@ export class OutdoorScoringPageComponent implements OnInit, OnDestroy {
       reader.onerror = () => reject(reader.error ?? new Error('Unable to read file.'));
       reader.readAsDataURL(file);
     });
+  }
+
+  private formatScanProgress(status: string, progress: number): string {
+    const label = status
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const percent = Math.round(progress * 100);
+
+    return percent > 0 && percent < 100 ? `${label} ${percent}%` : label;
   }
 
   private scheduleRender(): void {
