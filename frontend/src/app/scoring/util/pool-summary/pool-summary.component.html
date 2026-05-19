@@ -1,0 +1,25 @@
+<section class="pool-summary">
+  <header>
+    <div>
+      <p>{{ completedMatches }} / {{ totalMatches }} matches final</p>
+      <h3>{{ pool.title }}</h3>
+    </div>
+  </header>
+  <p class="match-summary">{{ matchSummary }}</p>
+  <div class="summary-standings">
+    <div class="summary-standings-header">
+      <span>Team</span>
+      <span>W</span>
+      <span>L</span>
+      <span>Diff</span>
+    </div>
+    @for (standing of standings; track standing.seed) {
+      <div class="summary-standing-row">
+        <span>{{ standing.name }}</span>
+        <span>{{ standing.wins }}</span>
+        <span>{{ standing.losses }}</span>
+        <span>{{ standing.pointDifferential }}</span>
+      </div>
+    }
+  </div>
+</section>

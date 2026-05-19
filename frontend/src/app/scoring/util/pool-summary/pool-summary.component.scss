@@ -1,0 +1,66 @@
+.pool-summary {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pool-summary header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.pool-summary p {
+  color: #5d6878;
+  margin: 0;
+}
+
+.pool-summary h3 {
+  margin: 0;
+}
+
+.match-summary {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-standings {
+  border: 1px solid #d8e0ea;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.summary-standings-header,
+.summary-standing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 44px 58px;
+}
+
+.summary-standings-header {
+  background: #f3f6fa;
+  color: #34465c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary-standings-header span,
+.summary-standing-row span {
+  border-bottom: 1px solid #e3e9f1;
+  padding: 8px;
+}
+
+.summary-standing-row:last-child span {
+  border-bottom: 0;
+}
+
+.summary-standing-row span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-standing-row span:nth-child(n + 2) {
+  text-align: center;
+}

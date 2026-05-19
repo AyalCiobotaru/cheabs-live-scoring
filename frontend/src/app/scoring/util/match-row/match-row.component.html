@@ -64,9 +64,11 @@
         } @else {
           <button type="button" (click)="markFinal()">Mark final</button>
         }
-        <button type="button" class="secondary" (click)="movedUp.emit()" [disabled]="first">Move up</button>
-        <button type="button" class="secondary" (click)="movedDown.emit()" [disabled]="last">Move down</button>
-        <button type="button" class="danger" (click)="removed.emit()">Remove</button>
+        @if (canEditSetup) {
+          <button type="button" class="secondary" (click)="movedUp.emit()" [disabled]="first">Move up</button>
+          <button type="button" class="secondary" (click)="movedDown.emit()" [disabled]="last">Move down</button>
+          <button type="button" class="danger" (click)="removed.emit()">Remove</button>
+        }
       </div>
     </section>
   }

@@ -68,6 +68,70 @@ h4 {
   grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
 }
 
+.landing-grid {
+  display: grid;
+  margin: 0 auto;
+  max-width: 460px;
+  width: 100%;
+}
+
+.admin-panel {
+  align-items: end;
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.event-dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.event-title,
+.pool-card header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.pool-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pool-card {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  cursor: pointer;
+  min-width: 0;
+  padding: 14px;
+}
+
+.pool-card:hover {
+  border-color: #9db1c8;
+}
+
+.event-title p,
+.pool-card p,
+.match-summary {
+  color: #5d6878;
+  margin: 0;
+}
+
+.match-summary {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .setup-panel,
 .scoreboard {
   background: #ffffff;
@@ -232,6 +296,10 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
 }
 
+.inline-fields.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .inline-fields:first-of-type {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -306,14 +374,15 @@ button:disabled {
   min-width: 0;
 }
 
-app-outdoor-match-row {
+app-match-row {
   min-width: 0;
 }
 
 @media (max-width: 900px) {
   .setup-grid,
   .teams-panel,
-  .match-grid {
+  .match-grid,
+  .pool-grid {
     grid-template-columns: 1fr;
   }
 

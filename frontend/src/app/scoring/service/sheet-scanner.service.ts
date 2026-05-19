@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import Tesseract from 'tesseract.js';
-import { OutdoorSheetScanMatch, OutdoorSheetScanResult, OutdoorSheetScanTeam } from './outdoor-scoring.models';
+import { SheetScanMatch, SheetScanResult, SheetScanTeam } from '../scoring.models';
 
-export interface OutdoorSheetScanProgress {
+export interface SheetScanProgress {
   status: string;
   progress: number;
 }
@@ -16,8 +16,8 @@ interface TeamTable {
 @Injectable({
   providedIn: 'root'
 })
-export class OutdoorSheetScannerService {
-  async scan(imageDataUrl: string, onProgress?: (progress: OutdoorSheetScanProgress) => void): Promise<OutdoorSheetScanResult> {
+export class SheetScannerService {
+  async scan(imageDataUrl: string, onProgress?: (progress: SheetScanProgress) => void): Promise<SheetScanResult> {
     const worker = await Tesseract.createWorker('eng', 1, {
       logger: (message) => {
         onProgress?.({
@@ -38,7 +38,7 @@ export class OutdoorSheetScannerService {
     }
   }
 
-  private parsePoolSheetText(text: string): OutdoorSheetScanResult {
+  private parsePoolSheetText(text: string): SheetScanResult {
     const lines = text
       .split(/\r?\n/)
       .map((line) => line.replace(/\s+/g, ' ').trim())
@@ -62,7 +62,7 @@ export class OutdoorSheetScannerService {
       gamesPerMatch: gameFormat.gamesPerMatch,
       targetScore: gameFormat.targetScore,
       teams,
-      matches: matches.length ? matches : this.defaultOutdoorSchedule(teamCount),
+      matches: matches.length ? matches : this.defaultSchedule(teamCount),
       notes
     };
   }
@@ -80,7 +80,7 @@ export class OutdoorSheetScannerService {
       return poolLine;
     }
 
-    return teamCount ? `${teamCount} Team Outdoor Pool` : null;
+    return teamCount ? `${teamCount} Team Pool` : null;
   }
 
   private detectTeamCount(text: string): number | null {
@@ -168,7 +168,7 @@ export class OutdoorSheetScannerService {
     return [...seeds].sort((a, b) => a - b);
   }
 
-  private detectTeams(lines: string[], teamCount: number | null, table = this.extractTeamTable(lines, teamCount)): OutdoorSheetScanTeam[] {
+  private detectTeams(lines: string[], teamCount: number | null, table = this.extractTeamTable(lines, teamCount)): SheetScanTeam[] {
     if (table.rows.length > 0) {
       return table.rows.map((line, index) => ({
         seed: index + 1,
@@ -237,7 +237,7 @@ export class OutdoorSheetScannerService {
     return this.cleanTeamName(withoutLevelColumn);
   }
 
-  private detectSeededTeamsFallback(lines: string[], teamCount: number | null): OutdoorSheetScanTeam[] {
+  private detectSeededTeamsFallback(lines: string[], teamCount: number | null): SheetScanTeam[] {
     const teams = new Map<number, string | null>();
     const maxSeed = teamCount ?? 7;
     let inTeamsSection = false;
@@ -275,8 +275,8 @@ export class OutdoorSheetScannerService {
     });
   }
 
-  private detectMatches(lines: string[], teamCount: number | null): OutdoorSheetScanMatch[] {
-    const matches: OutdoorSheetScanMatch[] = [];
+  private detectMatches(lines: string[], teamCount: number | null): SheetScanMatch[] {
+    const matches: SheetScanMatch[] = [];
 
     for (const line of lines) {
       const match = this.parseScheduleRow(line, teamCount, matches.length);
@@ -289,7 +289,7 @@ export class OutdoorSheetScannerService {
     return matches;
   }
 
-  private parseScheduleRow(line: string, teamCount: number | null, orderIndex: number): OutdoorSheetScanMatch | null {
+  private parseScheduleRow(line: string, teamCount: number | null, orderIndex: number): SheetScanMatch | null {
     const normalized = this.normalizeScheduleRow(line);
     const playMatch = normalized.match(/\b([1-7])\s*(?:vs|v5|ws|w5|wz|v)\s*([1-7])\b/i);
 
@@ -300,7 +300,7 @@ export class OutdoorSheetScannerService {
     const teamASeed = Number(playMatch[1]);
     const teamBSeed = Number(playMatch[2]);
     const afterPlay = normalized.slice((playMatch.index ?? 0) + playMatch[0].length);
-    const defaultMatch = this.defaultOutdoorSchedule(teamCount)[orderIndex];
+    const defaultMatch = this.defaultSchedule(teamCount)[orderIndex];
     const inferredRefSeed = this.sameMatchTeams(defaultMatch, teamASeed, teamBSeed) ? defaultMatch.refSeed : null;
 
     return {
@@ -351,13 +351,13 @@ export class OutdoorSheetScannerService {
     return 0;
   }
 
-  private sameMatchTeams(match: OutdoorSheetScanMatch | undefined, teamASeed: number, teamBSeed: number): boolean {
+  private sameMatchTeams(match: SheetScanMatch | undefined, teamASeed: number, teamBSeed: number): boolean {
     return Boolean(match)
       && ((match?.teamASeed === teamASeed && match.teamBSeed === teamBSeed)
         || (match?.teamASeed === teamBSeed && match.teamBSeed === teamASeed));
   }
 
-  private defaultOutdoorSchedule(teamCount: number | null): OutdoorSheetScanMatch[] {
+  private defaultSchedule(teamCount: number | null): SheetScanMatch[] {
     if (teamCount === 4) {
       return [
         { refSeed: 1, teamASeed: 2, teamBSeed: 4 },
@@ -410,13 +410,13 @@ export class OutdoorSheetScannerService {
     }[value.toLowerCase()] ?? null;
   }
 
-  private normalizePoolSheetScan(scan: OutdoorSheetScanResult): OutdoorSheetScanResult {
+  private normalizePoolSheetScan(scan: SheetScanResult): SheetScanResult {
     const teamCount = this.nullableInteger(scan.teamCount, 3, 7);
     const teams = Array.isArray(scan.teams)
       ? scan.teams.map((team) => ({
         seed: this.nullableInteger(team.seed, 1, 7),
         name: typeof team.name === 'string' && team.name.trim() ? team.name.trim() : null
-      })).filter((team): team is OutdoorSheetScanTeam => team.seed != null)
+      })).filter((team): team is SheetScanTeam => team.seed != null)
       : [];
     const matches = Array.isArray(scan.matches)
       ? scan.matches.map((match) => ({

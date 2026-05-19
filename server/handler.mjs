@@ -1,5 +1,7 @@
 import { Rest } from 'ably';
 
+const EVENT_TTL_SECONDS = 31 * 24 * 60 * 60;
+
 let ablyRest;
 
 export async function handleApiRequest(request, response) {
@@ -10,17 +12,130 @@ export async function handleApiRequest(request, response) {
 
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     const route = `${request.method} ${url.pathname}`;
+    const eventMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)$/);
+    const poolMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)$/);
+    const finalMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)\/final$/);
 
     if (route === 'GET /api/health') {
       return json(response, { ok: true });
     }
 
-    if (route === 'GET /api/outdoor-scoring/realtime-config') {
-      return json(response, { enabled: Boolean(process.env.ABLY_API_KEY) });
+    if (route === 'GET /api/scoring/realtime-config') {
+      return json(response, {
+        enabled: Boolean(process.env.ABLY_API_KEY),
+        persistenceEnabled: isRedisConfigured()
+      });
     }
 
-    if (route === 'GET /api/outdoor-scoring/ably-token') {
-      return json(response, await createOutdoorScoringAblyTokenRequest());
+    if (route === 'POST /api/scoring/admin-login') {
+      requireAdmin(request);
+      return json(response, { ok: true });
+    }
+
+    if (route === 'GET /api/scoring/ably-token') {
+      return json(response, await createScoringAblyTokenRequest());
+    }
+
+    if (route === 'POST /api/scoring/events') {
+      requireAdmin(request);
+      const payload = await readJson(request);
+      const code = normalizeEventCode(payload.code);
+      const now = new Date().toISOString();
+      const existing = await readEvent(code);
+
+      if (existing) {
+        throw httpError(409, 'An event with that code already exists.', 'ERR_EVENT_EXISTS');
+      }
+
+      const event = sanitizeEvent({
+        code,
+        name: typeof payload.name === 'string' && payload.name.trim() ? payload.name.trim() : code,
+        pools: [],
+        activePoolId: null,
+        updatedAt: now
+      }, code);
+      await writeEvent(event);
+      await publishEvent(event, 'event-updated');
+      return json(response, { event }, 201);
+    }
+
+    if (eventMatch && request.method === 'GET') {
+      const code = normalizeEventCode(eventMatch[1]);
+      const event = await readEvent(code);
+
+      if (!event) {
+        throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      }
+
+      return json(response, { event });
+    }
+
+    if (poolMatch && request.method === 'PUT') {
+      requireAdmin(request);
+      const code = normalizeEventCode(poolMatch[1]);
+      const poolId = decodeURIComponent(poolMatch[2]);
+      const payload = await readJson(request);
+      const existingEvent = await readEvent(code);
+      const event = existingEvent ?? sanitizeEvent({
+        code,
+        name: typeof payload.eventName === 'string' && payload.eventName.trim() ? payload.eventName.trim() : code,
+        pools: [],
+        activePoolId: null,
+        updatedAt: new Date().toISOString()
+      }, code);
+
+      const pool = sanitizePool({
+        ...payload.pool,
+        id: poolId,
+        imagePreview: null,
+        updatedAt: new Date().toISOString()
+      });
+      const existingIndex = event.pools.findIndex((candidate) => candidate.id === pool.id);
+      event.pools = existingIndex >= 0
+        ? event.pools.map((candidate) => candidate.id === pool.id ? pool : candidate)
+        : [...event.pools, pool];
+      event.activePoolId = pool.id;
+      event.updatedAt = new Date().toISOString();
+      await writeEvent(event);
+      await publishPoolSetup(event.code, pool);
+      return json(response, { event });
+    }
+
+    if (finalMatch && request.method === 'PUT') {
+      const code = normalizeEventCode(finalMatch[1]);
+      const poolId = decodeURIComponent(finalMatch[2]);
+      const matchId = decodeURIComponent(finalMatch[3]);
+      const payload = await readJson(request);
+      const event = await readEvent(code);
+
+      if (!event) {
+        throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      }
+
+      const pool = event.pools.find((candidate) => candidate.id === poolId);
+
+      if (!pool) {
+        throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
+      }
+
+      const match = sanitizeMatch({
+        ...payload.match,
+        id: matchId,
+        final: true,
+        updatedAt: new Date().toISOString()
+      }, pool.gamesPerMatch);
+      const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
+
+      if (existingIndex < 0) {
+        throw httpError(404, 'Match not found.', 'ERR_MATCH_NOT_FOUND');
+      }
+
+      pool.matches = pool.matches.map((candidate) => candidate.id === match.id ? match : candidate);
+      pool.updatedAt = match.updatedAt;
+      event.updatedAt = match.updatedAt;
+      await writeEvent(event);
+      await publishMatch(event.code, pool.id, match);
+      return json(response, { event, match });
     }
 
     return json(response, { error: 'Not found' }, 404);
@@ -38,7 +153,7 @@ export async function handleApiRequest(request, response) {
   }
 }
 
-async function createOutdoorScoringAblyTokenRequest() {
+async function createScoringAblyTokenRequest() {
   const key = process.env.ABLY_API_KEY;
 
   if (!key) {
@@ -49,9 +164,244 @@ async function createOutdoorScoringAblyTokenRequest() {
   return ablyRest.auth.createTokenRequest({
     ttl: 60 * 60 * 1000,
     capability: JSON.stringify({
-      'cheabs:live-scoring:global': ['publish', 'subscribe', 'history']
+      'cheabs:live-scoring:*': ['publish', 'subscribe', 'history']
     })
   });
+}
+
+async function publishEvent(event, kind) {
+  if (!process.env.ABLY_API_KEY) {
+    return;
+  }
+
+  ablyRest ??= new Rest({ key: process.env.ABLY_API_KEY });
+  const channel = ablyRest.channels.get(eventChannelName(event.code));
+  await channel.publish('event-update', {
+    clientId: 'server',
+    eventCode: event.code,
+    kind,
+    message: 'Scoring event update.',
+    updatedAt: new Date().toISOString(),
+    event: stripEventImages(event)
+  });
+}
+
+async function publishPoolSetup(eventCode, pool) {
+  if (!process.env.ABLY_API_KEY) {
+    return;
+  }
+
+  ablyRest ??= new Rest({ key: process.env.ABLY_API_KEY });
+  const channel = ablyRest.channels.get(eventChannelName(eventCode));
+  await channel.publish('event-update', {
+    clientId: 'server',
+    eventCode,
+    kind: 'pool-setup-updated',
+    message: 'Scoring pool setup update.',
+    updatedAt: new Date().toISOString(),
+    pool: stripPoolImage(pool)
+  });
+}
+
+async function publishMatch(eventCode, poolId, match) {
+  if (!process.env.ABLY_API_KEY) {
+    return;
+  }
+
+  ablyRest ??= new Rest({ key: process.env.ABLY_API_KEY });
+  const channel = ablyRest.channels.get(eventChannelName(eventCode));
+  await channel.publish('event-update', {
+    clientId: 'server',
+    eventCode,
+    kind: 'match-updated',
+    message: 'Scoring match update.',
+    updatedAt: new Date().toISOString(),
+    poolId,
+    match
+  });
+}
+
+async function readEvent(code) {
+  const result = await redisCommand(['GET', eventKey(code)]);
+
+  if (!result) {
+    return null;
+  }
+
+  return sanitizeEvent(JSON.parse(result), code);
+}
+
+async function writeEvent(event) {
+  await redisCommand(['SET', eventKey(event.code), JSON.stringify(stripEventImages(event)), 'EX', String(EVENT_TTL_SECONDS)]);
+}
+
+async function redisCommand(command) {
+  if (!isRedisConfigured()) {
+    throw httpError(503, 'Upstash Redis is not configured.', 'ERR_REDIS_NOT_CONFIGURED');
+  }
+
+  const response = await fetch(process.env.UPSTASH_REDIS_REST_URL, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(command)
+  });
+
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok || body.error) {
+    throw httpError(502, body.error || 'Unable to reach Upstash Redis.', 'ERR_REDIS');
+  }
+
+  return body.result;
+}
+
+function isRedisConfigured() {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+function eventKey(code) {
+  return `event:${code}`;
+}
+
+function eventChannelName(code) {
+  return `cheabs:live-scoring:event:${code}`;
+}
+
+function normalizeEventCode(value) {
+  const code = String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+
+  if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
+    throw httpError(400, 'Use an event code with letters, numbers, or hyphens.', 'ERR_EVENT_CODE');
+  }
+
+  return code;
+}
+
+function sanitizeEvent(event, code) {
+  const pools = Array.isArray(event?.pools) ? event.pools.map(sanitizePool).filter(Boolean) : [];
+  const activePoolId = typeof event?.activePoolId === 'string' && pools.some((pool) => pool.id === event.activePoolId)
+    ? event.activePoolId
+    : pools[0]?.id ?? null;
+
+  return {
+    code,
+    name: typeof event?.name === 'string' && event.name.trim() ? event.name.trim() : code,
+    pools,
+    activePoolId,
+    updatedAt: typeof event?.updatedAt === 'string' ? event.updatedAt : new Date().toISOString()
+  };
+}
+
+function sanitizePool(pool) {
+  if (!pool || typeof pool !== 'object') {
+    return null;
+  }
+
+  const id = typeof pool.id === 'string' && pool.id.trim() ? pool.id.trim() : createId();
+  const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
+  const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
+
+  return {
+    id,
+    title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
+    teamCount,
+    gamesPerMatch,
+    targetScore: clampWholeNumber(pool.targetScore, 1, 99),
+    teams: Array.isArray(pool.teams)
+      ? pool.teams.map((team, index) => ({
+        seed: clampWholeNumber(team?.seed ?? index + 1, 1, 7),
+        name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${index + 1}`
+      })).slice(0, teamCount)
+      : [],
+    matches: Array.isArray(pool.matches)
+      ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch))
+      : [],
+    imagePreview: null,
+    updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
+  };
+}
+
+function sanitizeMatch(match, gamesPerMatch) {
+  return {
+    id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
+    refSeed: nullableInteger(match?.refSeed, 1, 7),
+    teamASeed: nullableInteger(match?.teamASeed, 1, 7),
+    teamBSeed: nullableInteger(match?.teamBSeed, 1, 7),
+    games: Array.isArray(match?.games)
+      ? match.games.map((game) => ({
+        scoreA: wholeNumber(game?.scoreA),
+        scoreB: wholeNumber(game?.scoreB)
+      })).slice(0, gamesPerMatch)
+      : [],
+    final: Boolean(match?.final),
+    updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()
+  };
+}
+
+function stripEventImages(event) {
+  return {
+    ...event,
+    pools: event.pools.map((pool) => ({
+      ...pool,
+      imagePreview: null
+    }))
+  };
+}
+
+function stripPoolImage(pool) {
+  return {
+    ...pool,
+    imagePreview: null
+  };
+}
+
+function requireAdmin(request) {
+  const configured = process.env.ADMIN_PASSWORD;
+
+  if (!configured) {
+    throw httpError(503, 'Admin password is not configured.', 'ERR_ADMIN_NOT_CONFIGURED');
+  }
+
+  if (request.headers['x-admin-password'] !== configured) {
+    throw httpError(401, 'Admin sign-in required.', 'ERR_ADMIN_REQUIRED');
+  }
+}
+
+async function readJson(request) {
+  const chunks = [];
+
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  const text = Buffer.concat(chunks).toString('utf8');
+  return text ? JSON.parse(text) : {};
+}
+
+function clampWholeNumber(value, min, max) {
+  return Math.min(max, Math.max(min, wholeNumber(value)));
+}
+
+function nullableInteger(value, min, max) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= min && number <= max ? number : null;
+}
+
+function wholeNumber(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : 0;
+}
+
+function createId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function httpError(statusCode, message, code) {
@@ -78,7 +428,7 @@ function json(response, body, status = 200, extraHeaders = {}) {
 function corsHeaders() {
   return {
     'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'GET,POST,OPTIONS',
-    'access-control-allow-headers': 'content-type'
+    'access-control-allow-methods': 'GET,POST,PUT,OPTIONS',
+    'access-control-allow-headers': 'content-type,x-admin-password'
   };
 }

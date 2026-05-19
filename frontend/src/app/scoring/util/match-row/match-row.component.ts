@@ -1,23 +1,24 @@
 import { NgClass } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { OutdoorGameScore, OutdoorMatch, OutdoorTeam } from '../outdoor-scoring.models';
+import { GameScore, Match, Team } from '../../scoring.models';
 
 @Component({
-  selector: 'app-outdoor-match-row',
+  selector: 'app-match-row',
   standalone: true,
   imports: [FormsModule, NgClass],
-  templateUrl: './outdoor-match-row.component.html',
-  styleUrl: './outdoor-match-row.component.scss'
+  templateUrl: './match-row.component.html',
+  styleUrl: './match-row.component.scss'
 })
-export class OutdoorMatchRowComponent {
-  @Input({ required: true }) match!: OutdoorMatch;
-  @Input({ required: true }) teams: OutdoorTeam[] = [];
+export class MatchRowComponent {
+  @Input({ required: true }) match!: Match;
+  @Input({ required: true }) teams: Team[] = [];
   @Input({ required: true }) index = 0;
   @Input({ required: true }) targetScore = 25;
   @Input() expanded = false;
   @Input() first = false;
   @Input() last = false;
+  @Input() canEditSetup = false;
 
   @Output() expandedChange = new EventEmitter<boolean>();
   @Output() scoreChanged = new EventEmitter<void>();
@@ -38,7 +39,7 @@ export class OutdoorMatchRowComponent {
     this.expandedChange.emit(!this.expanded);
   }
 
-  updateScore(game: OutdoorGameScore, side: 'A' | 'B', change: number): void {
+  updateScore(game: GameScore, side: 'A' | 'B', change: number): void {
     if (this.match.final) {
       return;
     }
@@ -52,7 +53,7 @@ export class OutdoorMatchRowComponent {
     this.scoreChanged.emit();
   }
 
-  normalizeScore(game: OutdoorGameScore, side: 'A' | 'B'): void {
+  normalizeScore(game: GameScore, side: 'A' | 'B'): void {
     if (side === 'A') {
       game.scoreA = Math.max(0, this.wholeNumber(game.scoreA));
     } else {
