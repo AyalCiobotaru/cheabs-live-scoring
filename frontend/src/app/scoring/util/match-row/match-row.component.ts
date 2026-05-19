@@ -21,7 +21,7 @@ export class MatchRowComponent {
   @Input() canEditSetup = false;
 
   @Output() expandedChange = new EventEmitter<boolean>();
-  @Output() scoreChanged = new EventEmitter<void>();
+  @Output() scoreChanged = new EventEmitter<GameScore>();
   @Output() finalChanged = new EventEmitter<void>();
   @Output() movedUp = new EventEmitter<void>();
   @Output() movedDown = new EventEmitter<void>();
@@ -50,7 +50,7 @@ export class MatchRowComponent {
       game.scoreB = Math.max(0, this.wholeNumber(game.scoreB) + change);
     }
 
-    this.scoreChanged.emit();
+    this.scoreChanged.emit(game);
   }
 
   normalizeScore(game: GameScore, side: 'A' | 'B'): void {
@@ -59,7 +59,7 @@ export class MatchRowComponent {
     } else {
       game.scoreB = Math.max(0, this.wholeNumber(game.scoreB));
     }
-    this.scoreChanged.emit();
+    this.scoreChanged.emit(game);
   }
 
   markFinal(): void {

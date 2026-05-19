@@ -29,6 +29,16 @@
     </div>
   </header>
 
+  @if (sideSwitchToast) {
+    <aside class="side-switch-toast" role="status" aria-live="polite">
+      <div>
+        <strong>{{ sideSwitchToast.message }}</strong>
+        <span>{{ sideSwitchToast.detail }}</span>
+      </div>
+      <button type="button" class="toast-dismiss" aria-label="Dismiss switch sides reminder" (click)="dismissSideSwitchToast()">&times;</button>
+    </aside>
+  }
+
   @if (showingAdminSignIn && !isAdmin) {
     <section class="admin-panel">
       <label>
@@ -306,7 +316,7 @@
               [last]="last"
               [canEditSetup]="isAdmin"
               (expandedChange)="setExpanded(match.id, $event)"
-              (scoreChanged)="handleScoreChanged(match)"
+              (scoreChanged)="handleScoreChanged(match, $event)"
               (finalChanged)="handleFinalChanged(match)"
               (movedUp)="moveMatch(match.id, -1)"
               (movedDown)="moveMatch(match.id, 1)"

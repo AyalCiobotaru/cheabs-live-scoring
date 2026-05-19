@@ -35,6 +35,11 @@ interface PoolCard {
 
 type ViewMode = 'event' | 'pool' | 'setup';
 
+interface SideSwitchToast {
+  message: string;
+  detail: string;
+}
+
 const DEFAULT_SCHEDULES: Record<number, ScheduleTemplateRow[]> = {
   4: [
     { teamASeed: 2, teamBSeed: 4, refSeed: 1 },
@@ -88,8 +93,11 @@ export class ScoringPageComponent implements OnInit, OnDestroy {
   scanProgress = '';
   scanSummary: { read: string[]; assumed: string[]; manual: string[] } | null = null;
   scanStatus: 'idle' | 'scanning' | 'success' | 'failed' = 'idle';
+  sideSwitchToast: SideSwitchToast | null = null;
   readonly teamCountOptions = TEAM_COUNT_OPTIONS;
   readonly realtimeStatus$ = this.realtime.status$;
+  private sideSwitchToastTimeout: number | null = null;
+  private lastSideSwitchKey: string | null = null;
 
   constructor(
     private readonly changeDetector: ChangeDetectorRef,
@@ -121,6 +129,7 @@ export class ScoringPageComponent implements OnInit, OnDestroy {
     this.remoteMatchSubscription?.unsubscribe();
     this.snapshotRequestSubscription?.unsubscribe();
     this.realtime.close();
+    this.clearSideSwitchToastTimeout();
   }
 
   get activePool(): PoolState | null {
@@ -414,16 +423,23 @@ export class ScoringPageComponent implements OnInit, OnDestroy {
     this.touchPool(pool);
   }
 
-  handleScoreChanged(match: Match): void {
+  handleScoreChanged(match: Match, game: GameScore): void {
     const pool = this.activePool;
 
     if (!pool) {
       return;
     }
 
+    this.showSideSwitchToastIfNeeded(pool, match, game);
     this.touchMatch(pool, match);
     this.persistLocal();
     this.realtime.publishMatch(pool, match);
+  }
+
+  dismissSideSwitchToast(): void {
+    this.sideSwitchToast = null;
+    this.clearSideSwitchToastTimeout();
+    this.scheduleRender();
   }
 
   async handleFinalChanged(match: Match): Promise<void> {
@@ -968,6 +984,61 @@ export class ScoringPageComponent implements OnInit, OnDestroy {
     }
 
     return pool.teams.find((team) => team.seed === seed)?.name ?? `Team ${seed}`;
+  }
+
+  private showSideSwitchToastIfNeeded(pool: PoolState, match: Match, game: GameScore): void {
+    const interval = this.sideSwitchInterval(pool.targetScore);
+    const total = this.wholeNumber(game.scoreA) + this.wholeNumber(game.scoreB);
+    const gameIndex = match.games.indexOf(game);
+    const keyPrefix = `${pool.id}:${match.id}:${gameIndex}`;
+
+    if (!interval || total <= 0 || total % interval !== 0) {
+      if (this.lastSideSwitchKey?.startsWith(`${keyPrefix}:`)) {
+        this.lastSideSwitchKey = null;
+      }
+      return;
+    }
+
+    const key = `${keyPrefix}:${total}`;
+
+    if (key === this.lastSideSwitchKey) {
+      return;
+    }
+
+    this.lastSideSwitchKey = key;
+    this.sideSwitchToast = {
+      message: 'Switch sides',
+      detail: `${this.teamName(pool, match.teamASeed)} and ${this.teamName(pool, match.teamBSeed)} should switch sides.`
+    };
+    this.clearSideSwitchToastTimeout();
+    this.sideSwitchToastTimeout = window.setTimeout(() => {
+      this.zone.run(() => {
+        this.sideSwitchToast = null;
+        this.sideSwitchToastTimeout = null;
+        this.scheduleRender();
+      });
+    }, 10000);
+  }
+
+  private sideSwitchInterval(targetScore: number): number | null {
+    if (targetScore === 11) {
+      return 4;
+    }
+
+    if (targetScore === 15) {
+      return 5;
+    }
+
+    return null;
+  }
+
+  private clearSideSwitchToastTimeout(): void {
+    if (this.sideSwitchToastTimeout == null) {
+      return;
+    }
+
+    window.clearTimeout(this.sideSwitchToastTimeout);
+    this.sideSwitchToastTimeout = null;
   }
 
   private async errorMessage(response: Response): Promise<string> {
