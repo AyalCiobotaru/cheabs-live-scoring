@@ -1,0 +1,22 @@
+<span hidden>{{ scoring.version() }}</span>
+@if (scoring.isAdmin && scoring.activePool; as pool) {
+  <app-pool-setup
+    [pool]="pool"
+    [isAdmin]="scoring.isAdmin"
+    [teamCountOptions]="scoring.teamCountOptions"
+    [divisionOptions]="scoring.divisionOptions"
+    [scanStatus]="scoring.scanStatus"
+    [scanProgress]="scoring.scanProgress"
+    [scanSummary]="scoring.scanSummary"
+    [scanError]="scoring.scanError"
+    (sheetCaptured)="scoring.captureSheet($event)"
+    (sheetScanned)="scoring.scanPoolSheet()"
+    (saved)="scoring.save()"
+    (teamCountChanged)="scoring.changeTeamCount($event)"
+    (gameFormatApplied)="scoring.applyGameFormat()"
+    (poolSetupSaved)="scoring.savePoolSetup()"
+    (setupCanceled)="scoring.cancelSetup()"
+    (matchAdded)="scoring.addMatch()"
+    (matchRemoved)="scoring.removeMatch($event)"
+  ></app-pool-setup>
+}

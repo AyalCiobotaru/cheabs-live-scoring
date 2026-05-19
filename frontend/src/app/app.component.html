@@ -1,3 +1,70 @@
 <main>
-  <router-outlet></router-outlet>
+  <section class="scoring-shell" [attr.data-state-version]="scoring.version()">
+    <header class="page-header">
+      <app-side-menu
+        [hasEvent]="!!scoring.event"
+        [isAdmin]="scoring.isAdmin"
+        [poolCount]="scoring.poolCards.length"
+        [selectedDivision]="scoring.selectedDivision"
+        [divisionOptions]="scoring.divisionFilterOptions"
+        (poolsSelected)="scoring.openDashboard()"
+        (chooseEventSelected)="scoring.chooseEvent()"
+        (adminSelected)="scoring.showingAdminSignIn = !scoring.showingAdminSignIn"
+        (adminSignOutSelected)="scoring.adminSignOut()"
+        (divisionSelected)="scoring.selectDivision($event)"
+      ></app-side-menu>
+      <div class="header-title">
+        <p>Pool play scoring</p>
+        <h1>Cheabs Live Scoring</h1>
+      </div>
+      <div class="header-actions">
+        @if (scoring.realtimeStatus$ | async; as realtimeStatus) {
+          <span
+            class="realtime-status"
+            [class.connected]="realtimeStatus === 'connected'"
+            [class.failed]="realtimeStatus === 'failed'"
+          >
+            @if (realtimeStatus === 'connected') {
+              Live sync on
+            } @else if (realtimeStatus === 'disabled') {
+              Local only
+            } @else if (realtimeStatus === 'failed') {
+              Live sync error
+            } @else {
+              Live sync {{ realtimeStatus }}
+            }
+          </span>
+        }
+      </div>
+    </header>
+
+    @if (scoring.sideSwitchToast) {
+      <aside class="side-switch-toast" role="status" aria-live="polite">
+        <div>
+          <strong>{{ scoring.sideSwitchToast.message }}</strong>
+          <span>{{ scoring.sideSwitchToast.detail }}</span>
+        </div>
+        <button
+          type="button"
+          class="toast-dismiss"
+          aria-label="Dismiss switch sides reminder"
+          (click)="scoring.dismissSideSwitchToast()"
+        >
+          &times;
+        </button>
+      </aside>
+    }
+
+    @if (scoring.showingAdminSignIn && !scoring.isAdmin) {
+      <form class="admin-panel" (ngSubmit)="scoring.adminSignIn()">
+        <label>
+          Admin password
+          <input type="password" name="headerAdminPassword" [(ngModel)]="scoring.adminPassword" />
+        </label>
+        <button type="submit" class="secondary">Sign in</button>
+      </form>
+    }
+
+    <router-outlet></router-outlet>
+  </section>
 </main>

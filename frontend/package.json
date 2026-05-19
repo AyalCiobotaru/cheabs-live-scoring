@@ -7,6 +7,10 @@
     "start": "ng serve --proxy-config proxy.conf.json",
     "local": "ng serve --host 0.0.0.0 --proxy-config proxy.conf.json",
     "build": "ng build",
+    "lint": "ng lint",
+    "lint:fix": "ng lint --fix",
+    "format": "prettier --write --ignore-path ../.prettierignore \"src/**/*.{html,scss,ts}\" \"*.json\" \"*.mjs\" \"../*.{json,md}\" \"../server/**/*.mjs\"",
+    "format:check": "prettier --check --ignore-path ../.prettierignore \"src/**/*.{html,scss,ts}\" \"*.json\" \"*.mjs\" \"../*.{json,md}\" \"../server/**/*.mjs\"",
     "watch": "ng build --watch --configuration development"
   },
   "engines": {
@@ -31,9 +35,19 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.11",
+    "@angular-eslint/builder": "^21.4.0",
+    "@angular-eslint/eslint-plugin": "^21.4.0",
+    "@angular-eslint/eslint-plugin-template": "^21.4.0",
+    "@angular-eslint/template-parser": "^21.4.0",
     "@angular/cli": "^21.2.11",
     "@angular/compiler-cli": "^21.2.13",
-    "typescript": "~5.9.3"
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "^21.4.0",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.59.4"
   },
   "overrides": {
     "webpack-dev-server": "5.2.4"

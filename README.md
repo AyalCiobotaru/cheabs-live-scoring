@@ -36,3 +36,8 @@ Set these values in `.env` for the API:
 ## Future Plans
 
 - Editable best-guess playoff brackets
+- Division based filters
+
+## Bugs
+
+- When hitting back in the browser from a pool sheet and then forward, it takes a user back to the pool however it doesn't refresh the subscription to the event

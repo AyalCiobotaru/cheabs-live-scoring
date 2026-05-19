@@ -1,7 +1,7 @@
 import { Injectable, NgZone } from '@angular/core';
-import { BehaviorSubject, Subject } from 'rxjs';
 import { Realtime, type InboundMessage, type RealtimeChannel } from 'ably';
-import { EventState, Match, PoolState, RealtimeSnapshot } from './scoring.models';
+import { BehaviorSubject, Subject } from 'rxjs';
+import { EventState, Match, PoolState, RealtimeSnapshot } from '../models';
 
 type RealtimeStatus = 'checking' | 'disabled' | 'connecting' | 'connected' | 'failed';
 
@@ -134,7 +134,7 @@ export class ScoringRealtimeService {
         return false;
       }
 
-      const body = await response.json() as { enabled?: boolean };
+      const body = (await response.json()) as { enabled?: boolean };
       return body.enabled === true;
     } catch {
       return false;

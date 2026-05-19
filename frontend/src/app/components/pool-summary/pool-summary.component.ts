@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { PoolState, TeamStanding } from '../../scoring.models';
+import { PoolState, TeamStanding } from '../../models';
 
 @Component({
   selector: 'app-pool-summary',

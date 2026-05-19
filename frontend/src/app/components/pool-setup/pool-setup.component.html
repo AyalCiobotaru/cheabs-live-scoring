@@ -1,0 +1,165 @@
+<section class="setup-grid">
+  <div class="setup-panel camera-panel">
+    <h2>Pool Sheet</h2>
+    @if (isAdmin) {
+      <label class="camera-button">
+        <span>Take Pool Sheet photo</span>
+        <input type="file" accept="image/*" capture="environment" (change)="sheetCaptured.emit($event)" />
+      </label>
+      <button
+        type="button"
+        class="secondary"
+        (click)="sheetScanned.emit()"
+        [disabled]="!pool.imagePreview || scanStatus === 'scanning'"
+      >
+        {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
+      </button>
+    }
+    @if (scanStatus === 'scanning' && scanProgress) {
+      <p class="scan-progress">{{ scanProgress }}</p>
+    }
+    @if (scanStatus === 'success' && scanSummary) {
+      <section class="scan-summary">
+        <h3>Pool Sheet Read</h3>
+        @if (scanSummary.read.length) {
+          <div>
+            <strong>Read</strong>
+            <ul>
+              @for (item of scanSummary.read; track item) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </div>
+        }
+        @if (scanSummary.assumed.length) {
+          <div>
+            <strong>Assumed</strong>
+            <ul>
+              @for (item of scanSummary.assumed; track item) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </div>
+        }
+        @if (scanSummary.manual.length) {
+          <div>
+            <strong>Check</strong>
+            <ul>
+              @for (item of scanSummary.manual; track item) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
+    @if (scanError) {
+      <p class="scan-error">{{ scanError }}</p>
+    }
+    @if (pool.imagePreview) {
+      <img [src]="pool.imagePreview" alt="Captured Pool Sheet preview" />
+    } @else {
+      <div class="preview-placeholder">No photo captured</div>
+    }
+  </div>
+
+  <div class="setup-panel">
+    <h2>Pool Setup</h2>
+    <label>
+      Pool title
+      <input [(ngModel)]="pool.title" (ngModelChange)="saved.emit()" [disabled]="!isAdmin" />
+    </label>
+    <label>
+      Division
+      <select [(ngModel)]="pool.division" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+        @for (division of divisionOptions; track division) {
+          <option [ngValue]="division">{{ division }}</option>
+        }
+      </select>
+    </label>
+    <div class="inline-fields">
+      <label>
+        Teams
+        <select [ngModel]="pool.teamCount" (ngModelChange)="teamCountChanged.emit($event)" [disabled]="!isAdmin">
+          @for (count of teamCountOptions; track count) {
+            <option [ngValue]="count">{{ count }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    <div class="inline-fields">
+      <label>
+        Games per match
+        <input type="number" min="1" max="5" [(ngModel)]="pool.gamesPerMatch" [disabled]="!isAdmin" />
+      </label>
+      <label>
+        Target score
+        <input type="number" min="1" max="99" [(ngModel)]="pool.targetScore" [disabled]="!isAdmin" />
+      </label>
+      <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
+    </div>
+    @if (isAdmin) {
+      <button type="button" (click)="poolSetupSaved.emit()">Save pool setup</button>
+      <button type="button" class="secondary" (click)="setupCanceled.emit()">Cancel</button>
+    }
+  </div>
+
+  <div class="setup-panel teams-panel">
+    <h2>Teams</h2>
+    @for (team of pool.teams; track team.seed) {
+      <label>
+        Seed {{ team.seed }}
+        <input [(ngModel)]="team.name" (ngModelChange)="saved.emit()" [disabled]="!isAdmin" />
+      </label>
+    }
+  </div>
+
+  <div class="setup-panel schedule-panel">
+    <div class="section-title">
+      <h2>Schedule</h2>
+      @if (isAdmin) {
+        <button type="button" (click)="matchAdded.emit()">Add match</button>
+      }
+    </div>
+
+    @if (pool.matches.length) {
+      <div class="schedule-rows">
+        @for (match of pool.matches; track match.id; let index = $index) {
+          <div class="schedule-row">
+            <strong>{{ index + 1 }}</strong>
+            <label>
+              Work Team
+              <select [(ngModel)]="match.refSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                <option [ngValue]="null">None</option>
+                @for (team of pool.teams; track team.seed) {
+                  <option [ngValue]="team.seed">{{ team.seed }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              Team A
+              <select [(ngModel)]="match.teamASeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                @for (team of pool.teams; track team.seed) {
+                  <option [ngValue]="team.seed">{{ team.seed }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              Team B
+              <select [(ngModel)]="match.teamBSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                @for (team of pool.teams; track team.seed) {
+                  <option [ngValue]="team.seed">{{ team.seed }}</option>
+                }
+              </select>
+            </label>
+            @if (isAdmin) {
+              <button type="button" class="danger" (click)="matchRemoved.emit(match.id)">Remove</button>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <p class="empty-copy">Add the match rows from the pool sheet in the same order they appear.</p>
+    }
+  </div>
+</section>

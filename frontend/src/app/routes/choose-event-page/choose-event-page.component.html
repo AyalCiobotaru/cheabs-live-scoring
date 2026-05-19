@@ -1,0 +1,41 @@
+<section class="landing-grid" [attr.data-state-version]="scoring.version()">
+  <form class="setup-panel" (ngSubmit)="scoring.landingMode === 'create' ? scoring.createEvent() : scoring.joinEvent()">
+    <h2>{{ scoring.landingMode === 'create' ? 'Create event' : 'Join event' }}</h2>
+    <div class="inline-fields single">
+      <label>
+        Event code
+        <input name="eventCode" [(ngModel)]="scoring.eventCode" placeholder="FALL-BRAWL-FOURS" />
+      </label>
+    </div>
+    @if (scoring.landingMode === 'create') {
+      <label>
+        Event name
+        <input name="eventName" [(ngModel)]="scoring.eventName" placeholder="Fall Brawl Fours" />
+      </label>
+      @if (!scoring.isAdmin) {
+        <label>
+          Admin password
+          <input type="password" name="landingAdminPassword" [(ngModel)]="scoring.adminPassword" />
+        </label>
+        <button type="button" class="secondary" (click)="scoring.adminSignIn()">Sign in as admin</button>
+      }
+      <button type="submit" [disabled]="scoring.loadingEvent || !scoring.isAdmin">
+        {{ scoring.loadingEvent ? 'Creating...' : 'Create event' }}
+      </button>
+    } @else {
+      <button type="submit" [disabled]="scoring.loadingEvent">
+        {{ scoring.loadingEvent ? 'Joining...' : 'Join event' }}
+      </button>
+    }
+    <button
+      type="button"
+      class="secondary"
+      (click)="scoring.landingMode = scoring.landingMode === 'create' ? 'join' : 'create'"
+    >
+      {{ scoring.landingMode === 'create' ? 'Join an existing event' : 'Create a new event' }}
+    </button>
+    @if (scoring.eventError) {
+      <p class="scan-error">{{ scoring.eventError }}</p>
+    }
+  </form>
+</section>

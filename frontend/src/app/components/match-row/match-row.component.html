@@ -40,16 +40,34 @@
           <h4>Set {{ gameIndex + 1 }} to {{ targetScore }}</h4>
           <div class="score-controls">
             <div>
-              <label>{{ teamName(match.teamASeed) }}</label>
-              <input type="number" min="0" [(ngModel)]="game.scoreA" (ngModelChange)="normalizeScore(game, 'A')" [disabled]="match.final" />
+              <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-a'">{{
+                teamName(match.teamASeed)
+              }}</label>
+              <input
+                [id]="'match-' + match.id + '-set-' + gameIndex + '-team-a'"
+                type="number"
+                min="0"
+                [(ngModel)]="game.scoreA"
+                (ngModelChange)="normalizeScore(game, 'A')"
+                [disabled]="match.final"
+              />
               <div>
                 <button type="button" (click)="updateScore(game, 'A', -1)" [disabled]="match.final">-1</button>
                 <button type="button" (click)="updateScore(game, 'A', 1)" [disabled]="match.final">+1</button>
               </div>
             </div>
             <div>
-              <label>{{ teamName(match.teamBSeed) }}</label>
-              <input type="number" min="0" [(ngModel)]="game.scoreB" (ngModelChange)="normalizeScore(game, 'B')" [disabled]="match.final" />
+              <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-b'">{{
+                teamName(match.teamBSeed)
+              }}</label>
+              <input
+                [id]="'match-' + match.id + '-set-' + gameIndex + '-team-b'"
+                type="number"
+                min="0"
+                [(ngModel)]="game.scoreB"
+                (ngModelChange)="normalizeScore(game, 'B')"
+                [disabled]="match.final"
+              />
               <div>
                 <button type="button" (click)="updateScore(game, 'B', -1)" [disabled]="match.final">-1</button>
                 <button type="button" (click)="updateScore(game, 'B', 1)" [disabled]="match.final">+1</button>
