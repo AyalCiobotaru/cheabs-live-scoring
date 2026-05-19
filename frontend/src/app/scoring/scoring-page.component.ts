@@ -215,6 +215,17 @@ export class ScoringPageComponent implements OnInit, OnDestroy {
     this.expandedMatchId = null;
   }
 
+  chooseEvent(): void {
+    this.realtime.close();
+    this.event = null;
+    this.eventName = '';
+    this.viewMode = 'event';
+    this.draftPool = null;
+    this.expandedMatchId = null;
+    this.dismissSideSwitchToast();
+    localStorage.removeItem(CURRENT_EVENT_KEY);
+  }
+
   openPool(poolId: string): void {
     if (!this.event) {
       return;

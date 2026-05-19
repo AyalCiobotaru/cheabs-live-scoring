@@ -20,6 +20,7 @@
       }
       @if (event) {
         <button type="button" class="secondary" (click)="openDashboard()">Pools</button>
+        <button type="button" class="secondary" (click)="chooseEvent()">Choose event</button>
       }
       @if (isAdmin) {
         <button type="button" class="secondary" (click)="adminSignOut()">Admin on</button>
@@ -40,42 +41,42 @@
   }
 
   @if (showingAdminSignIn && !isAdmin) {
-    <section class="admin-panel">
+    <form class="admin-panel" (ngSubmit)="adminSignIn()">
       <label>
         Admin password
-        <input type="password" [(ngModel)]="adminPassword" />
+        <input type="password" name="headerAdminPassword" [(ngModel)]="adminPassword" />
       </label>
-      <button type="button" class="secondary" (click)="adminSignIn()">Sign in</button>
-    </section>
+      <button type="submit" class="secondary">Sign in</button>
+    </form>
   }
 
   @if (!event) {
     <section class="landing-grid">
-      <div class="setup-panel">
+      <form class="setup-panel" (ngSubmit)="landingMode === 'create' ? createEvent() : joinEvent()">
         <h2>{{ landingMode === 'create' ? 'Create event' : 'Join event' }}</h2>
         <div class="inline-fields single">
           <label>
             Event code
-            <input [(ngModel)]="eventCode" placeholder="FALL-BRAWL-FOURS" />
+            <input name="eventCode" [(ngModel)]="eventCode" placeholder="FALL-BRAWL-FOURS" />
           </label>
         </div>
         @if (landingMode === 'create') {
           <label>
             Event name
-            <input [(ngModel)]="eventName" placeholder="Fall Brawl Fours" />
+            <input name="eventName" [(ngModel)]="eventName" placeholder="Fall Brawl Fours" />
           </label>
           @if (!isAdmin) {
             <label>
               Admin password
-              <input type="password" [(ngModel)]="adminPassword" />
+              <input type="password" name="landingAdminPassword" [(ngModel)]="adminPassword" />
             </label>
             <button type="button" class="secondary" (click)="adminSignIn()">Sign in as admin</button>
           }
-          <button type="button" (click)="createEvent()" [disabled]="loadingEvent || !isAdmin">
+          <button type="submit" [disabled]="loadingEvent || !isAdmin">
             {{ loadingEvent ? 'Creating...' : 'Create event' }}
           </button>
         } @else {
-          <button type="button" (click)="joinEvent()" [disabled]="loadingEvent">
+          <button type="submit" [disabled]="loadingEvent">
             {{ loadingEvent ? 'Joining...' : 'Join event' }}
           </button>
         }
@@ -85,7 +86,7 @@
         @if (eventError) {
           <p class="scan-error">{{ eventError }}</p>
         }
-      </div>
+      </form>
     </section>
   }
 
