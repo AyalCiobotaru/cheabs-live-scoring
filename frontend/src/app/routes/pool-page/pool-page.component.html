@@ -1,0 +1,16 @@
+<span hidden>{{ scoring.version() }}</span>
+@if (scoring.event && scoring.activePool; as pool) {
+  <app-pool-view
+    [eventName]="scoring.event.name"
+    [pool]="pool"
+    [activePoolCard]="scoring.activePoolCard"
+    [expandedMatchId]="scoring.expandedMatchId"
+    [isAdmin]="scoring.isAdmin"
+    (editSetup)="scoring.editPoolSetup()"
+    (expandedChange)="handleExpandedChange($event)"
+    (scoreChanged)="handleMatchScoreChanged($event)"
+    (finalChanged)="scoring.handleFinalChanged($event)"
+    (moved)="handleMatchMoved($event)"
+    (removed)="scoring.removeMatch($event)"
+  ></app-pool-view>
+}

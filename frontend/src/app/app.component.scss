@@ -10,3 +10,529 @@ main {
     padding: 10px;
   }
 }
+
+.scoring-shell {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-header,
+.scoreboard > header,
+.section-title {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.header-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.header-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.realtime-status {
+  background: #f3f6fa;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.realtime-status.connected {
+  background: #eaf6ef;
+  border-color: #a8d1b6;
+  color: #245b34;
+}
+
+.realtime-status.failed {
+  background: #fff1f1;
+  border-color: #e1b1b1;
+  color: #9c2e2e;
+}
+
+.side-switch-toast {
+  align-items: center;
+  background: #163a5f;
+  border: 1px solid #0f2d4c;
+  border-radius: 6px;
+  bottom: 18px;
+  box-shadow: 0 10px 28px rgb(15 45 76 / 22%);
+  color: #ffffff;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  left: 50%;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 12px 12px 12px 14px;
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 20;
+}
+
+.side-switch-toast div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.side-switch-toast strong {
+  font-size: 14px;
+}
+
+.side-switch-toast span {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.toast-dismiss {
+  align-items: center;
+  background: rgb(255 255 255 / 12%);
+  border-color: rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  display: flex;
+  flex: 0 0 auto;
+  height: 30px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 30px;
+}
+
+.toast-dismiss:hover {
+  background: rgb(255 255 255 / 20%);
+}
+
+.page-header p,
+.scoreboard p,
+.active-match p,
+.empty-copy {
+  color: #5d6878;
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+}
+
+.page-header h1 {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.setup-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.landing-grid {
+  display: grid;
+  margin: 0 auto;
+  max-width: 460px;
+  width: 100%;
+}
+
+.admin-panel {
+  align-items: end;
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.event-dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.division-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.division-group {
+  display: grid;
+  gap: 10px;
+}
+
+.division-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.division-heading h3 {
+  color: #34465c;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.division-heading span {
+  color: #5d6878;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.event-title,
+.pool-card header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.pool-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pool-card {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  cursor: pointer;
+  min-width: 0;
+  padding: 14px;
+}
+
+.pool-card:hover {
+  border-color: #9db1c8;
+}
+
+.event-title p,
+.pool-card p,
+.match-summary {
+  color: #5d6878;
+  margin: 0;
+}
+
+.match-summary {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.setup-panel,
+.scoreboard {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.teams-panel,
+.schedule-panel {
+  grid-column: 1 / -1;
+}
+
+.teams-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teams-panel h2 {
+  grid-column: 1 / -1;
+}
+
+label {
+  color: #34465c;
+  display: grid;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+input,
+select {
+  border: 1px solid #bcc8d6;
+  border-radius: 4px;
+  font: inherit;
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
+button,
+.camera-button {
+  background: #143f6b;
+  border: 1px solid #143f6b;
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+button:hover,
+.camera-button:hover {
+  background: #0f3155;
+}
+
+button:disabled {
+  background: #d8e0ea;
+  border-color: #c5d0dd;
+  color: #718093;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: #ffffff;
+  border-color: #b8c5d6;
+  color: #34465c;
+}
+
+.secondary:hover {
+  background: #eef3f8;
+}
+
+.danger {
+  background: #ffffff;
+  border-color: #c99191;
+  color: #9c2e2e;
+}
+
+.danger:hover {
+  background: #fff1f1;
+}
+
+.camera-button input {
+  display: none;
+}
+
+.camera-panel img,
+.preview-placeholder {
+  aspect-ratio: 4 / 3;
+  border: 1px solid #d8e0ea;
+  border-radius: 4px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.preview-placeholder {
+  align-items: center;
+  background: #f3f6fa;
+  color: #718093;
+  display: flex;
+  justify-content: center;
+}
+
+.scan-error,
+.scan-progress {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scan-error {
+  color: #9c2e2e;
+}
+
+.scan-progress {
+  color: #325b75;
+}
+
+.scan-summary {
+  background: #f6faf7;
+  border: 1px solid #bad7c4;
+  border-radius: 6px;
+  color: #244634;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.scan-summary h3 {
+  font-size: 15px;
+}
+
+.scan-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.scan-summary strong {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.scan-summary ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.scan-summary li {
+  font-size: 13px;
+}
+
+.inline-fields {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+}
+
+.inline-fields.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inline-fields:first-of-type {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.schedule-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-row {
+  align-items: end;
+  border: 1px solid #e3e9f1;
+  border-radius: 4px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px repeat(3, minmax(90px, 1fr)) auto;
+  padding: 10px;
+}
+
+.schedule-row strong {
+  align-self: center;
+  color: #526071;
+}
+
+.standings {
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.standings-header,
+.standing-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 70px 70px 70px;
+}
+
+.standings-header {
+  background: #f3f6fa;
+  color: #34465c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.standings-header span,
+.standing-row strong,
+.standing-row span {
+  border-bottom: 1px solid #e3e9f1;
+  padding: 10px;
+}
+
+.standing-row:last-child strong,
+.standing-row:last-child span {
+  border-bottom: 0;
+}
+
+.standing-row strong,
+.standing-row span:nth-child(n + 3) {
+  text-align: center;
+}
+
+.standing-row span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+app-match-row {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .setup-grid,
+  .teams-panel,
+  .match-grid,
+  .pool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-row strong {
+    align-self: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .scoreboard > header,
+  .section-title,
+  .header-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-header {
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .header-actions {
+    flex: 1 0 100%;
+  }
+
+  .inline-fields,
+  .inline-fields:first-of-type {
+    grid-template-columns: 1fr;
+  }
+
+  .standings-header,
+  .standing-row {
+    grid-template-columns: 48px minmax(0, 1fr) 54px 54px 54px;
+  }
+
+  .page-header h1 {
+    font-size: 30px;
+  }
+
+  .scoreboard > .pool-view-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .pool-view-header .header-actions {
+    flex: 0 0 auto;
+  }
+}

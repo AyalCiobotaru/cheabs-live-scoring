@@ -1,0 +1,44 @@
+<section class="scoreboard">
+  <header class="pool-view-header">
+    <div>
+      <p>{{ eventName }}</p>
+      <h2>{{ pool.title }}</h2>
+    </div>
+    <div class="header-actions">
+      @if (isAdmin) {
+        <button type="button" class="secondary" (click)="editSetup.emit()">Edit setup</button>
+      }
+    </div>
+  </header>
+
+  @if (activePoolCard; as card) {
+    <app-pool-summary
+      [pool]="card.pool"
+      [standings]="card.standings"
+      [matchSummary]="card.matchSummary"
+      [completedMatches]="card.completedMatches"
+      [totalMatches]="card.totalMatches"
+    ></app-pool-summary>
+  }
+
+  <section class="match-grid">
+    @for (match of pool.matches; track match.id; let index = $index; let first = $first; let last = $last) {
+      <app-match-row
+        [match]="match"
+        [teams]="pool.teams"
+        [index]="index"
+        [targetScore]="pool.targetScore"
+        [expanded]="expandedMatchId === match.id"
+        [first]="first"
+        [last]="last"
+        [canEditSetup]="isAdmin"
+        (expandedChange)="expandedChange.emit({ matchId: match.id, expanded: $event })"
+        (scoreChanged)="scoreChanged.emit({ match, game: $event })"
+        (finalChanged)="finalChanged.emit(match)"
+        (movedUp)="moved.emit({ matchId: match.id, direction: -1 })"
+        (movedDown)="moved.emit({ matchId: match.id, direction: 1 })"
+        (removed)="removed.emit(match.id)"
+      ></app-match-row>
+    }
+  </section>
+</section>

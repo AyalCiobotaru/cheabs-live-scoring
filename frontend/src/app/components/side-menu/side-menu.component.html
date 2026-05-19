@@ -1,0 +1,56 @@
+<button type="button" class="menu-button" aria-label="Open menu" [attr.aria-expanded]="menuOpen" (click)="toggleMenu()">
+  <span aria-hidden="true">&#9776;</span>
+</button>
+
+@if (menuOpen) {
+  <button type="button" class="menu-backdrop" aria-label="Close menu" (click)="closeMenu()"></button>
+}
+
+<aside class="side-menu" [class.open]="menuOpen" aria-label="Main menu">
+  <div class="side-menu-header">
+    <strong>Menu</strong>
+    <button type="button" class="secondary" (click)="closeMenu()">Close</button>
+  </div>
+  <nav class="side-menu-actions">
+    @if (hasEvent) {
+      <button type="button" class="menu-action" (click)="selectPools()">Pools</button>
+      <button type="button" class="menu-action" (click)="selectChooseEvent()">Choose event</button>
+    }
+    @if (isAdmin) {
+      <button type="button" class="menu-action" (click)="selectAdminSignOut()">Sign Out</button>
+    } @else {
+      <button type="button" class="menu-action" (click)="selectAdmin()">Admin</button>
+    }
+  </nav>
+  @if (hasEvent && poolCount > 0) {
+    <div class="side-menu-divider"></div>
+    <button
+      type="button"
+      class="menu-action divisions-control"
+      [attr.aria-expanded]="divisionsExpanded"
+      (click)="toggleDivisions()"
+    >
+      <span>Divisions</span>
+      <span class="dropdown-arrow" [class.open]="divisionsExpanded" aria-hidden="true"></span>
+    </button>
+    @if (divisionsExpanded) {
+      <div class="division-dropdown">
+        <button type="button" class="division-item" [class.active]="!selectedDivision" (click)="selectDivision(null)">
+          <span>All divisions</span>
+          <small>{{ poolCount }}</small>
+        </button>
+        @for (option of divisionOptions; track option.division) {
+          <button
+            type="button"
+            class="division-item"
+            [class.active]="selectedDivision === option.division"
+            (click)="selectDivision(option.division)"
+          >
+            <span>{{ option.division }}</span>
+            <small>{{ option.count }}</small>
+          </button>
+        }
+      </div>
+    }
+  }
+</aside>

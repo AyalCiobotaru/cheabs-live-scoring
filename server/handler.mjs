@@ -1,6 +1,7 @@
 import { Rest } from 'ably';
 
 const EVENT_TTL_SECONDS = 31 * 24 * 60 * 60;
+const DIVISION_OPTIONS = ['Open', 'AA', 'A/AA', 'A', 'BB', 'B/BB', 'B'];
 
 let ablyRest;
 
@@ -14,7 +15,9 @@ export async function handleApiRequest(request, response) {
     const route = `${request.method} ${url.pathname}`;
     const eventMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)$/);
     const poolMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)$/);
-    const finalMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)\/final$/);
+    const finalMatch = url.pathname.match(
+      /^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)\/final$/
+    );
 
     if (route === 'GET /api/health') {
       return json(response, { ok: true });
@@ -47,13 +50,16 @@ export async function handleApiRequest(request, response) {
         throw httpError(409, 'An event with that code already exists.', 'ERR_EVENT_EXISTS');
       }
 
-      const event = sanitizeEvent({
-        code,
-        name: typeof payload.name === 'string' && payload.name.trim() ? payload.name.trim() : code,
-        pools: [],
-        activePoolId: null,
-        updatedAt: now
-      }, code);
+      const event = sanitizeEvent(
+        {
+          code,
+          name: typeof payload.name === 'string' && payload.name.trim() ? payload.name.trim() : code,
+          pools: [],
+          activePoolId: null,
+          updatedAt: now
+        },
+        code
+      );
       await writeEvent(event);
       await publishEvent(event, 'event-updated');
       return json(response, { event }, 201);
@@ -76,13 +82,18 @@ export async function handleApiRequest(request, response) {
       const poolId = decodeURIComponent(poolMatch[2]);
       const payload = await readJson(request);
       const existingEvent = await readEvent(code);
-      const event = existingEvent ?? sanitizeEvent({
-        code,
-        name: typeof payload.eventName === 'string' && payload.eventName.trim() ? payload.eventName.trim() : code,
-        pools: [],
-        activePoolId: null,
-        updatedAt: new Date().toISOString()
-      }, code);
+      const event =
+        existingEvent ??
+        sanitizeEvent(
+          {
+            code,
+            name: typeof payload.eventName === 'string' && payload.eventName.trim() ? payload.eventName.trim() : code,
+            pools: [],
+            activePoolId: null,
+            updatedAt: new Date().toISOString()
+          },
+          code
+        );
 
       const pool = sanitizePool({
         ...payload.pool,
@@ -91,9 +102,10 @@ export async function handleApiRequest(request, response) {
         updatedAt: new Date().toISOString()
       });
       const existingIndex = event.pools.findIndex((candidate) => candidate.id === pool.id);
-      event.pools = existingIndex >= 0
-        ? event.pools.map((candidate) => candidate.id === pool.id ? pool : candidate)
-        : [...event.pools, pool];
+      event.pools =
+        existingIndex >= 0
+          ? event.pools.map((candidate) => (candidate.id === pool.id ? pool : candidate))
+          : [...event.pools, pool];
       event.activePoolId = pool.id;
       event.updatedAt = new Date().toISOString();
       await writeEvent(event);
@@ -118,19 +130,22 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
       }
 
-      const match = sanitizeMatch({
-        ...payload.match,
-        id: matchId,
-        final: true,
-        updatedAt: new Date().toISOString()
-      }, pool.gamesPerMatch);
+      const match = sanitizeMatch(
+        {
+          ...payload.match,
+          id: matchId,
+          final: true,
+          updatedAt: new Date().toISOString()
+        },
+        pool.gamesPerMatch
+      );
       const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
 
       if (existingIndex < 0) {
         throw httpError(404, 'Match not found.', 'ERR_MATCH_NOT_FOUND');
       }
 
-      pool.matches = pool.matches.map((candidate) => candidate.id === match.id ? match : candidate);
+      pool.matches = pool.matches.map((candidate) => (candidate.id === match.id ? match : candidate));
       pool.updatedAt = match.updatedAt;
       event.updatedAt = match.updatedAt;
       await writeEvent(event);
@@ -145,11 +160,15 @@ export async function handleApiRequest(request, response) {
       code: error.code,
       message: error.message
     });
-    return json(response, {
-      error: [400, 401, 403, 404, 409, 413].includes(status) ? error.message : 'Internal server error',
-      code: error.code ?? 'ERR_INTERNAL',
-      message: error.message
-    }, status);
+    return json(
+      response,
+      {
+        error: [400, 401, 403, 404, 409, 413].includes(status) ? error.message : 'Internal server error',
+        code: error.code ?? 'ERR_INTERNAL',
+        message: error.message
+      },
+      status
+    );
   }
 }
 
@@ -232,7 +251,13 @@ async function readEvent(code) {
 }
 
 async function writeEvent(event) {
-  await redisCommand(['SET', eventKey(event.code), JSON.stringify(stripEventImages(event)), 'EX', String(EVENT_TTL_SECONDS)]);
+  await redisCommand([
+    'SET',
+    eventKey(event.code),
+    JSON.stringify(stripEventImages(event)),
+    'EX',
+    String(EVENT_TTL_SECONDS)
+  ]);
 }
 
 async function redisCommand(command) {
@@ -285,11 +310,17 @@ function normalizeEventCode(value) {
   return code;
 }
 
+function normalizeDivision(value) {
+  const division = typeof value === 'string' ? value.trim() : '';
+  return DIVISION_OPTIONS.includes(division) ? division : DIVISION_OPTIONS[0];
+}
+
 function sanitizeEvent(event, code) {
   const pools = Array.isArray(event?.pools) ? event.pools.map(sanitizePool).filter(Boolean) : [];
-  const activePoolId = typeof event?.activePoolId === 'string' && pools.some((pool) => pool.id === event.activePoolId)
-    ? event.activePoolId
-    : pools[0]?.id ?? null;
+  const activePoolId =
+    typeof event?.activePoolId === 'string' && pools.some((pool) => pool.id === event.activePoolId)
+      ? event.activePoolId
+      : (pools[0]?.id ?? null);
 
   return {
     code,
@@ -312,18 +343,19 @@ function sanitizePool(pool) {
   return {
     id,
     title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
+    division: normalizeDivision(pool.division),
     teamCount,
     gamesPerMatch,
     targetScore: clampWholeNumber(pool.targetScore, 1, 99),
     teams: Array.isArray(pool.teams)
-      ? pool.teams.map((team, index) => ({
-        seed: clampWholeNumber(team?.seed ?? index + 1, 1, 7),
-        name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${index + 1}`
-      })).slice(0, teamCount)
+      ? pool.teams
+          .map((team, index) => ({
+            seed: clampWholeNumber(team?.seed ?? index + 1, 1, 7),
+            name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${index + 1}`
+          }))
+          .slice(0, teamCount)
       : [],
-    matches: Array.isArray(pool.matches)
-      ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch))
-      : [],
+    matches: Array.isArray(pool.matches) ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch)) : [],
     imagePreview: null,
     updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
   };
@@ -336,10 +368,12 @@ function sanitizeMatch(match, gamesPerMatch) {
     teamASeed: nullableInteger(match?.teamASeed, 1, 7),
     teamBSeed: nullableInteger(match?.teamBSeed, 1, 7),
     games: Array.isArray(match?.games)
-      ? match.games.map((game) => ({
-        scoreA: wholeNumber(game?.scoreA),
-        scoreB: wholeNumber(game?.scoreB)
-      })).slice(0, gamesPerMatch)
+      ? match.games
+          .map((game) => ({
+            scoreA: wholeNumber(game?.scoreA),
+            scoreB: wholeNumber(game?.scoreB)
+          }))
+          .slice(0, gamesPerMatch)
       : [],
     final: Boolean(match?.final),
     updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()

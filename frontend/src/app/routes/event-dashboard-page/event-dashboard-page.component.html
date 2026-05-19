@@ -1,0 +1,11 @@
+<span hidden>{{ scoring.version() }}</span>
+@if (scoring.event) {
+  <app-event-dashboard
+    [event]="scoring.event"
+    [isAdmin]="scoring.isAdmin"
+    [poolCards]="scoring.poolCards"
+    [visibleDivisionPoolGroups]="scoring.visibleDivisionPoolGroups"
+    (addPool)="scoring.startAddPool()"
+    (poolSelected)="scoring.openPool($event)"
+  ></app-event-dashboard>
+}

@@ -1,0 +1,50 @@
+<section class="event-dashboard">
+  <div class="event-title">
+    <div>
+      <p>Event {{ event.code }}</p>
+      <h2>{{ event.name }}</h2>
+    </div>
+    @if (isAdmin) {
+      <button type="button" (click)="addPool.emit()">Add pool</button>
+    }
+  </div>
+
+  @if (poolCards.length) {
+    <section class="division-groups">
+      @for (group of visibleDivisionPoolGroups; track group.division) {
+        <section class="division-group">
+          <div class="division-heading">
+            <h3>{{ group.division }}</h3>
+            <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
+          </div>
+          <div class="pool-grid">
+            @for (card of group.cards; track card.pool.id) {
+              <article
+                class="pool-card"
+                role="button"
+                tabindex="0"
+                (click)="poolSelected.emit(card.pool.id)"
+                (keydown.enter)="poolSelected.emit(card.pool.id)"
+              >
+                <app-pool-summary
+                  [pool]="card.pool"
+                  [standings]="card.standings"
+                  [matchSummary]="card.matchSummary"
+                  [completedMatches]="card.completedMatches"
+                  [totalMatches]="card.totalMatches"
+                ></app-pool-summary>
+              </article>
+            }
+          </div>
+        </section>
+      }
+    </section>
+  } @else {
+    <div class="setup-panel">
+      <p class="empty-copy">No pools have been added yet.</p>
+      @if (isAdmin) {
+        <button type="button" (click)="addPool.emit()">Add pool</button>
+      }
+    </div>
+  }
+</section>

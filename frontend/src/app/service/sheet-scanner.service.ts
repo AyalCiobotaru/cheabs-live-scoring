@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import Tesseract from 'tesseract.js';
-import { SheetScanMatch, SheetScanResult, SheetScanTeam } from '../scoring.models';
+import { SheetScanMatch, SheetScanResult, SheetScanTeam } from '../models';
 
 export interface SheetScanProgress {
   status: string;
@@ -96,13 +96,13 @@ export class SheetScannerService {
   private detectGameFormat(text: string): { gamesPerMatch: number | null; targetScore: number | null } {
     const lines = this.normalizePoolSheetText(text).split(/\r?\n/).filter(Boolean);
     const shorthandMatch = this.extractHandwrittenGameFormat(lines.join('\n'));
-    const poolFormatLine = lines.find((line) => (
-      /\b(?:competition|round robin|pool play)\b/i.test(line)
-      && !/\bplayoffs?\b/i.test(line)
-    ));
-    const match = shorthandMatch
-      ?? this.extractGameFormat(poolFormatLine)
-      ?? this.extractGameFormat(lines.filter((line) => !/\bplayoffs?\b/i.test(line)).join('\n'));
+    const poolFormatLine = lines.find(
+      (line) => /\b(?:competition|round robin|pool play)\b/i.test(line) && !/\bplayoffs?\b/i.test(line)
+    );
+    const match =
+      shorthandMatch ??
+      this.extractGameFormat(poolFormatLine) ??
+      this.extractGameFormat(lines.filter((line) => !/\bplayoffs?\b/i.test(line)).join('\n'));
 
     return {
       gamesPerMatch: match ? Number(match[1]) : null,
@@ -121,8 +121,11 @@ export class SheetScannerService {
   }
 
   private extractGameFormat(text = ''): RegExpMatchArray | null {
-    return text.match(/\b([1-5])\s*(?:games?|sets?|set)\s*(?:during pool play\s*)?(?:is|are)?\s*(?:to|of|using|x)\s*([0-9]{1,2})\b/i)
-      ?? text.match(/\b([1-5])\s*(?:games?|sets?|set)\s*(?:to|of|x)\s*([0-9]{1,2})\b/i);
+    return (
+      text.match(
+        /\b([1-5])\s*(?:games?|sets?|set)\s*(?:during pool play\s*)?(?:is|are)?\s*(?:to|of|using|x)\s*([0-9]{1,2})\b/i
+      ) ?? text.match(/\b([1-5])\s*(?:games?|sets?|set)\s*(?:to|of|x)\s*([0-9]{1,2})\b/i)
+    );
   }
 
   private extractHandwrittenGameFormat(text = ''): RegExpMatchArray | null {
@@ -137,7 +140,7 @@ export class SheetScannerService {
     }
 
     const targetScore = this.normalizeHandwrittenTargetScore(match[1]);
-    return targetScore ? [match[0], '2', String(targetScore)] as unknown as RegExpMatchArray : null;
+    return targetScore ? ([match[0], '2', String(targetScore)] as unknown as RegExpMatchArray) : null;
   }
 
   private normalizeHandwrittenTargetScore(value: string): number | null {
@@ -168,7 +171,11 @@ export class SheetScannerService {
     return [...seeds].sort((a, b) => a - b);
   }
 
-  private detectTeams(lines: string[], teamCount: number | null, table = this.extractTeamTable(lines, teamCount)): SheetScanTeam[] {
+  private detectTeams(
+    lines: string[],
+    teamCount: number | null,
+    table = this.extractTeamTable(lines, teamCount)
+  ): SheetScanTeam[] {
     if (table.rows.length > 0) {
       return table.rows.map((line, index) => ({
         seed: index + 1,
@@ -224,15 +231,12 @@ export class SheetScannerService {
   }
 
   private isLikelyTeamTableRow(line: string): boolean {
-    return !/\b(?:vs|v5|ws)\b/i.test(line)
-      && !/\b(?:competition|playoffs?)\b/i.test(line);
+    return !/\b(?:vs|v5|ws)\b/i.test(line) && !/\b(?:competition|playoffs?)\b/i.test(line);
   }
 
   private cleanTeamNameFromTableRow(line: string, hasLevelColumn: boolean): string | null {
     const withoutSeedColumn = line.replace(/^\S+\s+/, '');
-    const withoutLevelColumn = hasLevelColumn
-      ? withoutSeedColumn.replace(/\s+\S+$/, '')
-      : withoutSeedColumn;
+    const withoutLevelColumn = hasLevelColumn ? withoutSeedColumn.replace(/\s+\S+$/, '') : withoutSeedColumn;
 
     return this.cleanTeamName(withoutLevelColumn);
   }
@@ -352,9 +356,11 @@ export class SheetScannerService {
   }
 
   private sameMatchTeams(match: SheetScanMatch | undefined, teamASeed: number, teamBSeed: number): boolean {
-    return Boolean(match)
-      && ((match?.teamASeed === teamASeed && match.teamBSeed === teamBSeed)
-        || (match?.teamASeed === teamBSeed && match.teamBSeed === teamASeed));
+    return (
+      Boolean(match) &&
+      ((match?.teamASeed === teamASeed && match.teamBSeed === teamBSeed) ||
+        (match?.teamASeed === teamBSeed && match.teamBSeed === teamASeed))
+    );
   }
 
   private defaultSchedule(teamCount: number | null): SheetScanMatch[] {
@@ -399,31 +405,35 @@ export class SheetScannerService {
   }
 
   private numberWord(value: string): number | null {
-    return {
-      one: 1,
-      two: 2,
-      three: 3,
-      four: 4,
-      five: 5,
-      six: 6,
-      seven: 7
-    }[value.toLowerCase()] ?? null;
+    return (
+      {
+        one: 1,
+        two: 2,
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7
+      }[value.toLowerCase()] ?? null
+    );
   }
 
   private normalizePoolSheetScan(scan: SheetScanResult): SheetScanResult {
     const teamCount = this.nullableInteger(scan.teamCount, 3, 7);
     const teams = Array.isArray(scan.teams)
-      ? scan.teams.map((team) => ({
-        seed: this.nullableInteger(team.seed, 1, 7),
-        name: typeof team.name === 'string' && team.name.trim() ? team.name.trim() : null
-      })).filter((team): team is SheetScanTeam => team.seed != null)
+      ? scan.teams
+          .map((team) => ({
+            seed: this.nullableInteger(team.seed, 1, 7),
+            name: typeof team.name === 'string' && team.name.trim() ? team.name.trim() : null
+          }))
+          .filter((team): team is SheetScanTeam => team.seed != null)
       : [];
     const matches = Array.isArray(scan.matches)
       ? scan.matches.map((match) => ({
-        refSeed: this.nullableInteger(match.refSeed, 1, 7),
-        teamASeed: this.nullableInteger(match.teamASeed, 1, 7),
-        teamBSeed: this.nullableInteger(match.teamBSeed, 1, 7)
-      }))
+          refSeed: this.nullableInteger(match.refSeed, 1, 7),
+          teamASeed: this.nullableInteger(match.teamASeed, 1, 7),
+          teamBSeed: this.nullableInteger(match.teamBSeed, 1, 7)
+        }))
       : [];
     const notes = Array.isArray(scan.notes)
       ? scan.notes.filter((note) => typeof note === 'string' && note.trim()).map((note) => note.trim())

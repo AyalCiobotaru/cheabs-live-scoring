@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix frontend run lint:fix",
+    "format": "npm --prefix frontend run format",
+    "format:check": "npm --prefix frontend run format:check",
     "start:api": "node --env-file=.env server/local-server.mjs",
     "start:api:debug": "node --inspect-brk=9229 --env-file=.env ./server/local-server.mjs",
     "vercel-build": "npm --prefix frontend run build"

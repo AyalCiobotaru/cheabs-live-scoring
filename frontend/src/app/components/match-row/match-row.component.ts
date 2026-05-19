@@ -1,7 +1,7 @@
 import { NgClass } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { GameScore, Match, Team } from '../../scoring.models';
+import { GameScore, Match, Team } from '../../models';
 
 @Component({
   selector: 'app-match-row',
