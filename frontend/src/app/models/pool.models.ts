@@ -6,6 +6,7 @@ export interface Team {
 export interface GameScore {
   scoreA: number;
   scoreB: number;
+  final: boolean;
 }
 
 export interface Match {
@@ -25,6 +26,7 @@ export interface PoolState {
   teamCount: number;
   gamesPerMatch: number;
   targetScore: number;
+  pointCap: number;
   teams: Team[];
   matches: Match[];
   imagePreview: string | null;

@@ -40,6 +40,7 @@ export const createDefaultPool = (title = 'Pool'): PoolState => ({
   teamCount: 4,
   gamesPerMatch: 2,
   targetScore: defaultTargetScore(4),
+  pointCap: defaultCap(4),
   teams: [1, 2, 3, 4].map((seed) => ({ seed, name: `Team ${seed}` })),
   matches: createTemplateMatches(4, 2),
   imagePreview: null,
@@ -77,7 +78,9 @@ export const createTemplateMatches = (teamCount: number, gamesPerMatch = 2): Mat
 export const createGames = (gamesPerMatch = 2): GameScore[] =>
   Array.from({ length: gamesPerMatch }, () => ({
     scoreA: 0,
-    scoreB: 0
+    scoreB: 0,
+    final: false
   }));
 
 export const defaultTargetScore = (teamCount: number): number => (teamCount === 4 ? 15 : 11);
+export const defaultCap = (teamCount: number): number => (defaultTargetScore(teamCount) === 11 ? 13 : 17);

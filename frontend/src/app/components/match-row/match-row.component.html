@@ -37,50 +37,81 @@
     <section class="expanded-scoring">
       @for (game of match.games; track $index; let gameIndex = $index) {
         <div class="game-panel">
-          <h4>Set {{ gameIndex + 1 }} to {{ targetScore }}</h4>
-          <div class="score-controls">
-            <div>
-              <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-a'">{{
-                teamName(match.teamASeed)
-              }}</label>
-              <input
-                [id]="'match-' + match.id + '-set-' + gameIndex + '-team-a'"
-                type="number"
-                min="0"
-                [(ngModel)]="game.scoreA"
-                (ngModelChange)="normalizeScore(game, 'A')"
-                [disabled]="match.final"
-              />
-              <div>
-                <button type="button" (click)="updateScore(game, 'A', -1)" [disabled]="match.final">-1</button>
-                <button type="button" (click)="updateScore(game, 'A', 1)" [disabled]="match.final">+1</button>
-              </div>
-            </div>
-            <div>
-              <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-b'">{{
-                teamName(match.teamBSeed)
-              }}</label>
-              <input
-                [id]="'match-' + match.id + '-set-' + gameIndex + '-team-b'"
-                type="number"
-                min="0"
-                [(ngModel)]="game.scoreB"
-                (ngModelChange)="normalizeScore(game, 'B')"
-                [disabled]="match.final"
-              />
-              <div>
-                <button type="button" (click)="updateScore(game, 'B', -1)" [disabled]="match.final">-1</button>
-                <button type="button" (click)="updateScore(game, 'B', 1)" [disabled]="match.final">+1</button>
-              </div>
-            </div>
+          <div class="game-panel-header">
+            <h4>Set {{ gameIndex + 1 }} to {{ targetScore }}</h4>
+            @if (game.final) {
+              <button type="button" class="secondary" (click)="reopenGame(game)" [disabled]="match.final">
+                Reopen set
+              </button>
+            }
           </div>
+          @if (canScoreGame(gameIndex)) {
+            <div class="score-controls">
+              <div>
+                <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-a'">{{
+                  teamName(match.teamASeed)
+                }}</label>
+                <input
+                  [id]="'match-' + match.id + '-set-' + gameIndex + '-team-a'"
+                  type="number"
+                  min="0"
+                  [max]="pointCap"
+                  [ngModel]="game.scoreA"
+                  (ngModelChange)="setScore(game, 'A', $event)"
+                  [disabled]="match.final || game.final"
+                />
+                <div>
+                  <button type="button" (click)="updateScore(game, 'A', -1)" [disabled]="match.final || game.final">
+                    -1
+                  </button>
+                  <button type="button" (click)="updateScore(game, 'A', 1)" [disabled]="match.final || game.final">
+                    +1
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label [for]="'match-' + match.id + '-set-' + gameIndex + '-team-b'">{{
+                  teamName(match.teamBSeed)
+                }}</label>
+                <input
+                  [id]="'match-' + match.id + '-set-' + gameIndex + '-team-b'"
+                  type="number"
+                  min="0"
+                  [max]="pointCap"
+                  [ngModel]="game.scoreB"
+                  (ngModelChange)="setScore(game, 'B', $event)"
+                  [disabled]="match.final || game.final"
+                />
+                <div>
+                  <button type="button" (click)="updateScore(game, 'B', -1)" [disabled]="match.final || game.final">
+                    -1
+                  </button>
+                  <button type="button" (click)="updateScore(game, 'B', 1)" [disabled]="match.final || game.final">
+                    +1
+                  </button>
+                </div>
+              </div>
+            </div>
+            @if (!game.final) {
+              <button
+                type="button"
+                class="secondary"
+                (click)="markGameFinal(game)"
+                [disabled]="match.final || !canMarkGameFinal(game)"
+              >
+                Mark set final
+              </button>
+            }
+          } @else {
+            <p class="locked-set">Set {{ gameIndex }} must be marked final before Set {{ gameIndex + 1 }} can be scored.</p>
+          }
         </div>
       }
       <div class="row-actions">
         @if (match.final) {
           <button type="button" class="secondary" (click)="reopen()">Reopen</button>
         } @else {
-          <button type="button" (click)="markFinal()">Mark final</button>
+          <button type="button" (click)="markFinal()" [disabled]="!canMarkFinal()">Mark final</button>
         }
         @if (canEditSetup) {
           <button type="button" class="secondary" (click)="movedUp.emit()" [disabled]="first">Move up</button>

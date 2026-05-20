@@ -137,7 +137,8 @@ export async function handleApiRequest(request, response) {
           final: true,
           updatedAt: new Date().toISOString()
         },
-        pool.gamesPerMatch
+        pool.gamesPerMatch,
+        pool.pointCap
       );
       const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
 
@@ -339,6 +340,8 @@ function sanitizePool(pool) {
   const id = typeof pool.id === 'string' && pool.id.trim() ? pool.id.trim() : createId();
   const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
   const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
+  const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
+  const pointCap = pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99);
 
   return {
     id,
@@ -346,7 +349,8 @@ function sanitizePool(pool) {
     division: normalizeDivision(pool.division),
     teamCount,
     gamesPerMatch,
-    targetScore: clampWholeNumber(pool.targetScore, 1, 99),
+    targetScore,
+    pointCap,
     teams: Array.isArray(pool.teams)
       ? pool.teams
           .map((team, index) => ({
@@ -355,13 +359,13 @@ function sanitizePool(pool) {
           }))
           .slice(0, teamCount)
       : [],
-    matches: Array.isArray(pool.matches) ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch)) : [],
+    matches: Array.isArray(pool.matches) ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch, pointCap)) : [],
     imagePreview: null,
     updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
   };
 }
 
-function sanitizeMatch(match, gamesPerMatch) {
+function sanitizeMatch(match, gamesPerMatch, pointCap = 99) {
   return {
     id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
     refSeed: nullableInteger(match?.refSeed, 1, 7),
@@ -370,8 +374,9 @@ function sanitizeMatch(match, gamesPerMatch) {
     games: Array.isArray(match?.games)
       ? match.games
           .map((game) => ({
-            scoreA: wholeNumber(game?.scoreA),
-            scoreB: wholeNumber(game?.scoreB)
+            scoreA: clampWholeNumber(game?.scoreA, 0, pointCap),
+            scoreB: clampWholeNumber(game?.scoreB, 0, pointCap),
+            final: Boolean(game?.final)
           }))
           .slice(0, gamesPerMatch)
       : [],
@@ -422,6 +427,14 @@ async function readJson(request) {
 
 function clampWholeNumber(value, min, max) {
   return Math.min(max, Math.max(min, wholeNumber(value)));
+}
+
+function defaultTargetScore(teamCount) {
+  return teamCount === 4 ? 15 : 11;
+}
+
+function defaultCap(teamCount) {
+  return defaultTargetScore(teamCount) === 11 ? 13 : 17;
 }
 
 function nullableInteger(value, min, max) {

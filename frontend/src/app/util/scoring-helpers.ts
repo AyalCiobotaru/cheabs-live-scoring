@@ -34,6 +34,7 @@ export const resizeGamesForCount = (games: GameScore[], count: number): GameScor
     const existing = games[index];
     return {
       scoreA: wholeNumber(existing?.scoreA),
-      scoreB: wholeNumber(existing?.scoreB)
+      scoreB: wholeNumber(existing?.scoreB),
+      final: Boolean(existing?.final)
     };
   });

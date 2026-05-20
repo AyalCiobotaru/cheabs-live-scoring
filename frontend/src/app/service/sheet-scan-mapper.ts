@@ -1,5 +1,5 @@
 import { PoolState, ScanSummary, SheetScanResult } from '../models';
-import { createScannedMatch, createTemplateMatches, defaultTargetScore } from '../util/pool-setup-rules';
+import { createScannedMatch, createTemplateMatches, defaultCap, defaultTargetScore } from '../util/pool-setup-rules';
 import { clampWholeNumber, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 
 export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, title: string): PoolState => {
@@ -7,12 +7,15 @@ export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, tit
   const scannedTeams = new Map(scan.teams.map((team) => [wholeNumber(team.seed), team.name?.trim() || null]));
   const gamesPerMatch = clampWholeNumber(scan.gamesPerMatch ?? pool.gamesPerMatch, 1, 5);
 
+  const targetScore = scan.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(scan.targetScore, 1, 99);
+
   return {
     ...pool,
     title,
     teamCount,
     gamesPerMatch,
-    targetScore: scan.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(scan.targetScore, 1, 99),
+    targetScore,
+    pointCap: scan.targetScore == null ? pool.pointCap : defaultCap(teamCount),
     teams: Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
       return {

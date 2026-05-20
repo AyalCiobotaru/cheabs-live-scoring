@@ -26,6 +26,7 @@
                 (click)="poolSelected.emit(card.pool.id)"
                 (keydown.enter)="poolSelected.emit(card.pool.id)"
               >
+                <h4 class="pool-card-title">{{ card.pool.title }}</h4>
                 <app-pool-summary
                   [pool]="card.pool"
                   [standings]="card.standings"

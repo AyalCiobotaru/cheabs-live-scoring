@@ -18,6 +18,7 @@ import {
   createGames,
   createTemplateMatches,
   defaultTargetScore,
+  defaultCap,
   TEAM_COUNT_OPTIONS
 } from '../util/pool-setup-rules';
 import { clampWholeNumber, createId, resizeGamesForCount, seedOrNull, wholeNumber } from '../util/scoring-helpers';
@@ -533,6 +534,7 @@ export class ScoringEventStateService {
     });
     pool.matches = createTemplateMatches(count, pool.gamesPerMatch);
     pool.targetScore = defaultTargetScore(count);
+    pool.pointCap = defaultCap(count);
     this.expandedMatchId = null;
     this.touchPool(pool);
     this.bump();
@@ -547,9 +549,10 @@ export class ScoringEventStateService {
 
     pool.gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     pool.targetScore = clampWholeNumber(pool.targetScore, 1, 99);
+    pool.pointCap = clampWholeNumber(pool.pointCap, 1, 99);
     pool.matches = pool.matches.map((match) => ({
       ...match,
-      games: resizeGamesForCount(match.games, pool.gamesPerMatch)
+      games: resizeGamesForCount(match.games, pool.gamesPerMatch).map((game) => this.capGameScore(game, pool.pointCap))
     }));
     this.touchPool(pool);
     this.bump();
@@ -598,6 +601,7 @@ export class ScoringEventStateService {
       return;
     }
 
+    this.capGameScore(game, pool.pointCap);
     this.showSideSwitchToastIfNeeded(pool, match, game);
     this.touchMatch(pool, match);
     this.persistLocal();
@@ -785,7 +789,7 @@ export class ScoringEventStateService {
       return;
     }
 
-    const match = this.normalizeMatch(remote, pool.gamesPerMatch);
+    const match = this.normalizeMatch(remote, pool.gamesPerMatch, pool.pointCap);
     const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
 
     if (existingIndex < 0 || this.isNewer(match.updatedAt, pool.matches[existingIndex].updatedAt)) {
@@ -869,6 +873,8 @@ export class ScoringEventStateService {
     const baseline = createDefaultPool();
     const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
     const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
+    const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
+    const pointCap = pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99);
     const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
     const teams = Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
@@ -881,10 +887,11 @@ export class ScoringEventStateService {
       division: normalizeDivision(pool.division),
       teamCount,
       gamesPerMatch,
-      targetScore: pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99),
+      targetScore,
+      pointCap,
       teams,
       matches: Array.isArray(pool.matches)
-        ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch))
+        ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch, pointCap))
         : [],
       imagePreview: typeof pool.imagePreview === 'string' ? pool.imagePreview : null,
       updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : null
@@ -904,17 +911,25 @@ export class ScoringEventStateService {
     pool.updatedAt = new Date().toISOString();
   }
 
-  private normalizeMatch(match: Match, gamesPerMatch: number): Match {
+  private normalizeMatch(match: Match, gamesPerMatch: number, pointCap = 99): Match {
     return {
       ...match,
       id: typeof match.id === 'string' && match.id.trim() ? match.id : createId(),
       refSeed: seedOrNull(match.refSeed, 7),
       teamASeed: seedOrNull(match.teamASeed, 7),
       teamBSeed: seedOrNull(match.teamBSeed, 7),
-      games: resizeGamesForCount(match.games ?? [], gamesPerMatch),
+      games: resizeGamesForCount(match.games ?? [], gamesPerMatch).map((game) => this.capGameScore(game, pointCap)),
       final: Boolean(match.final),
       updatedAt: typeof match.updatedAt === 'string' ? match.updatedAt : null
     };
+  }
+
+  private capGameScore(game: GameScore, pointCap: number): GameScore {
+    const cap = clampWholeNumber(pointCap, 1, 99);
+    game.scoreA = clampWholeNumber(game.scoreA, 0, cap);
+    game.scoreB = clampWholeNumber(game.scoreB, 0, cap);
+    game.final = Boolean(game.final);
+    return game;
   }
 
   private touchMatch(pool: PoolState, match: Match): void {

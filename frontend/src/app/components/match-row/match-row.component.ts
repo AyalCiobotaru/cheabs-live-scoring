@@ -15,6 +15,7 @@ export class MatchRowComponent {
   @Input({ required: true }) teams: Team[] = [];
   @Input({ required: true }) index = 0;
   @Input({ required: true }) targetScore = 25;
+  @Input({ required: true }) pointCap = 25;
   @Input() expanded = false;
   @Input() first = false;
   @Input() last = false;
@@ -45,24 +46,59 @@ export class MatchRowComponent {
     }
 
     if (side === 'A') {
-      game.scoreA = Math.max(0, this.wholeNumber(game.scoreA) + change);
+      game.scoreA = this.capScore(this.wholeNumber(game.scoreA) + change);
     } else {
-      game.scoreB = Math.max(0, this.wholeNumber(game.scoreB) + change);
+      game.scoreB = this.capScore(this.wholeNumber(game.scoreB) + change);
     }
 
     this.scoreChanged.emit(game);
   }
 
-  normalizeScore(game: GameScore, side: 'A' | 'B'): void {
+  setScore(game: GameScore, side: 'A' | 'B', value: unknown): void {
     if (side === 'A') {
-      game.scoreA = Math.max(0, this.wholeNumber(game.scoreA));
+      game.scoreA = this.capScore(value);
     } else {
-      game.scoreB = Math.max(0, this.wholeNumber(game.scoreB));
+      game.scoreB = this.capScore(value);
     }
+
     this.scoreChanged.emit(game);
+  }
+
+  markGameFinal(game: GameScore): void {
+    if (!this.canMarkGameFinal(game)) {
+      return;
+    }
+
+    game.final = true;
+    this.scoreChanged.emit(game);
+  }
+
+  reopenGame(game: GameScore): void {
+    if (this.match.final) {
+      return;
+    }
+
+    game.final = false;
+    this.scoreChanged.emit(game);
+  }
+
+  canScoreGame(gameIndex: number): boolean {
+    return gameIndex === 0 || Boolean(this.match.games[gameIndex - 1]?.final);
+  }
+
+  canMarkGameFinal(game: GameScore): boolean {
+    return this.wholeNumber(game.scoreA) !== this.wholeNumber(game.scoreB);
+  }
+
+  canMarkFinal(): boolean {
+    return this.match.games.every((game) => game.final);
   }
 
   markFinal(): void {
+    if (!this.canMarkFinal()) {
+      return;
+    }
+
     this.match.final = true;
     this.expandedChange.emit(false);
     this.finalChanged.emit();
@@ -77,5 +113,10 @@ export class MatchRowComponent {
   private wholeNumber(value: unknown): number {
     const number = Number(value);
     return Number.isInteger(number) && number >= 0 ? number : 0;
+  }
+
+  private capScore(value: unknown): number {
+    const cap = Math.max(1, this.wholeNumber(this.pointCap));
+    return Math.min(cap, Math.max(0, this.wholeNumber(value)));
   }
 }

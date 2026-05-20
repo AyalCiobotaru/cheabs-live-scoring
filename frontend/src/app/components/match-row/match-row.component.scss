@@ -182,6 +182,26 @@ button:disabled {
   padding: 12px;
 }
 
+.game-panel-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.game-panel-header .secondary {
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.locked-set {
+  background: #f3f6fa;
+  border: 1px solid #e3e9f1;
+  border-radius: 4px;
+  padding: 10px;
+}
+
 .score-controls {
   display: grid;
   gap: 10px;

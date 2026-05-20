@@ -1,8 +1,8 @@
 <section class="pool-summary">
   <header>
     <div>
-      <p>{{ completedMatches }} / {{ totalMatches }} matches final</p>
-      <h3>{{ pool.title }}</h3>
+      <p>{{ completedMatches }} / {{ totalMatches }} matches finished</p>
+      <h4>{{ pool.gamesPerMatch }} game{{pool.gamesPerMatch > 1? 's': ''}} to {{pool.targetScore}}, cap {{pool.pointCap}}</h4>
     </div>
   </header>
   <p class="match-summary">{{ matchSummary }}</p>

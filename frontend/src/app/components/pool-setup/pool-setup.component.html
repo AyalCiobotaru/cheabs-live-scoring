@@ -78,24 +78,30 @@
       </select>
     </label>
     <div class="inline-fields">
-      <label>
-        Teams
-        <select [ngModel]="pool.teamCount" (ngModelChange)="teamCountChanged.emit($event)" [disabled]="!isAdmin">
-          @for (count of teamCountOptions; track count) {
-            <option [ngValue]="count">{{ count }}</option>
-          }
-        </select>
-      </label>
-    </div>
-    <div class="inline-fields">
-      <label>
-        Games per match
-        <input type="number" min="1" max="5" [(ngModel)]="pool.gamesPerMatch" [disabled]="!isAdmin" />
-      </label>
-      <label>
-        Target score
-        <input type="number" min="1" max="99" [(ngModel)]="pool.targetScore" [disabled]="!isAdmin" />
-      </label>
+      <div class="pool-format-fields">
+        <label>
+          Teams
+          <select [ngModel]="pool.teamCount" (ngModelChange)="teamCountChanged.emit($event)" [disabled]="!isAdmin">
+            @for (count of teamCountOptions; track count) {
+              <option [ngValue]="count">{{ count }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Games per match
+          <input type="number" min="1" max="5" [(ngModel)]="pool.gamesPerMatch" [disabled]="!isAdmin" />
+        </label>
+      </div>
+      <div class="score-format-fields">
+        <label>
+          Target score
+          <input type="number" min="1" max="99" [(ngModel)]="pool.targetScore" [disabled]="!isAdmin" />
+        </label>
+        <label>
+          Cap
+          <input type="number" min="1" max="99" [(ngModel)]="pool.pointCap" [disabled]="!isAdmin" />
+        </label>
+      </div>
       <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
     </div>
     @if (isAdmin) {

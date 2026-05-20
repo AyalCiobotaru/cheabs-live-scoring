@@ -40,4 +40,4 @@ Set these values in `.env` for the API:
 
 ## Bugs
 
-- When hitting back in the browser from a pool sheet and then forward, it takes a user back to the pool however it doesn't refresh the subscription to the event
+- Add the ability to choose a photo from library on mobile
