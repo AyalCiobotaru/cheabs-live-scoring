@@ -5,6 +5,7 @@
     [isAdmin]="scoring.isAdmin"
     [teamCountOptions]="scoring.teamCountOptions"
     [divisionOptions]="scoring.divisionOptions"
+    [schedulePresets]="scoring.schedulePresetsFor(pool.teamCount)"
     [scanStatus]="scoring.scanStatus"
     [scanProgress]="scoring.scanProgress"
     [scanSummary]="scoring.scanSummary"
@@ -17,6 +18,8 @@
     (poolSetupSaved)="scoring.savePoolSetup()"
     (setupCanceled)="scoring.cancelSetup()"
     (matchAdded)="scoring.addMatch()"
+    (matchMoved)="scoring.moveMatch($event.matchId, $event.direction)"
     (matchRemoved)="scoring.removeMatch($event)"
+    (schedulePresetApplied)="scoring.applySchedulePreset($event)"
   ></app-pool-setup>
 }

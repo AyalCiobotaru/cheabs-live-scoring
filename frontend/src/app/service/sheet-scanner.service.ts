@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import Tesseract from 'tesseract.js';
-import { SheetScanMatch, SheetScanResult, SheetScanTeam } from '../models';
+import { SheetScanBounds, SheetScanMatch, SheetScanOcrLine, SheetScanResult, SheetScanTeam } from '../models';
+import { DIVISION_OPTIONS, normalizeDivision } from '../util/division-rules';
 
 export interface SheetScanProgress {
   status: string;
@@ -13,33 +13,44 @@ interface TeamTable {
   consumedIndexes: Set<number>;
 }
 
+interface OcrResponse {
+  text?: string;
+  lines?: SheetScanOcrLine[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class SheetScannerService {
-  async scan(imageDataUrl: string, onProgress?: (progress: SheetScanProgress) => void): Promise<SheetScanResult> {
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: (message) => {
-        onProgress?.({
-          status: message.status,
-          progress: message.progress
-        });
-      }
+  async scan(
+    imageDataUrl: string,
+    onProgress?: (progress: SheetScanProgress) => void,
+    adminPassword = ''
+  ): Promise<SheetScanResult> {
+    onProgress?.({ status: 'Uploading Pool Sheet to Google Vision...', progress: 0.2 });
+
+    const response = await fetch('/api/scoring/sheet-ocr', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-admin-password': adminPassword
+      },
+      body: JSON.stringify({ imageDataUrl })
     });
 
-    try {
-      await worker.setParameters({
-        tessedit_pageseg_mode: Tesseract.PSM.AUTO
-      });
-      const { data } = await worker.recognize(imageDataUrl);
-      return this.normalizePoolSheetScan(this.parsePoolSheetText(data.text ?? ''));
-    } finally {
-      await worker.terminate();
+    if (!response.ok) {
+      throw new Error(await this.errorMessage(response));
     }
+
+    onProgress?.({ status: 'Parsing Google Vision text...', progress: 0.8 });
+    const body = (await response.json()) as OcrResponse;
+    return this.normalizePoolSheetScan(this.parsePoolSheetOcr(body));
   }
 
-  private parsePoolSheetText(text: string): SheetScanResult {
-    const lines = text
+  private parsePoolSheetOcr(ocr: OcrResponse): SheetScanResult {
+    const ocrLines = this.normalizeOcrLines(ocr.lines);
+    const sourceText = ocr.text ?? ocrLines.map((line) => line.text).join('\n');
+    const lines = sourceText
       .split(/\r?\n/)
       .map((line) => line.replace(/\s+/g, ' ').trim())
       .filter(Boolean);
@@ -47,22 +58,21 @@ export class SheetScannerService {
     const teamCount = this.detectTeamCount(joined) ?? (this.detectTeamSeeds(lines).length || null);
     const gameFormat = this.detectGameFormat(joined);
     const teamTable = this.extractTeamTable(lines, teamCount);
-    const teams = this.detectTeams(lines, teamCount, teamTable);
-    const linesWithoutTeams = this.removeConsumedLines(lines, teamTable.consumedIndexes);
-    const matches = this.detectMatches(linesWithoutTeams, teamCount);
-    const notes = ['Parsed with browser OCR. Review handwritten team names before scoring.'];
-
-    if (matches.length === 0 && (teamCount === 4 || teamCount === 5)) {
-      notes.push('Could not read the match rows clearly, so the default schedule for this pool size was used.');
-    }
+    const teams = this.detectTeamsFromOcrLines(ocrLines, teamCount) ?? this.detectTeams(lines, teamCount, teamTable);
+    const notes = [
+      'Parsed with Google Vision OCR. Review handwritten team names before scoring.',
+      'Schedule was generated from the pool size instead of parsed from the sheet.'
+    ];
 
     return {
       title: this.detectTitle(lines, teamCount),
+      division: this.detectDivision(lines),
       teamCount,
       gamesPerMatch: gameFormat.gamesPerMatch,
       targetScore: gameFormat.targetScore,
       teams,
-      matches: matches.length ? matches : this.defaultSchedule(teamCount),
+      matches: [],
+      ocrLines,
       notes
     };
   }
@@ -83,14 +93,24 @@ export class SheetScannerService {
     return teamCount ? `${teamCount} Team Pool` : null;
   }
 
+  private detectDivision(lines: string[]): string | null {
+    const divisionLine = lines.find((line) => /\bdivision\b/i.test(line));
+    const match = divisionLine?.match(/\bdivision\s*:\s*(.+)$/i);
+    const rawDivision = match?.[1]?.replace(/\b(?:women'?s|men'?s|coed)\b/gi, '').trim();
+    const division = DIVISION_OPTIONS.find((option) => option.toLowerCase() === rawDivision?.toLowerCase());
+
+    return division ?? null;
+  }
+
   private detectTeamCount(text: string): number | null {
     const match = text.match(/\b(three|four|five|six|seven|[3-7])[\s-]+teams?(?:[\s-]+(?:pool|net))?\b/i);
 
-    if (!match) {
-      return null;
+    if (match) {
+      return Number(match[1]) || this.numberWord(match[1]);
     }
 
-    return Number(match[1]) || this.numberWord(match[1]);
+    const compactMatch = text.match(/\b([3-7])\s*team\s*(?:net|pool)?\b/i);
+    return compactMatch ? Number(compactMatch[1]) : null;
   }
 
   private detectGameFormat(text: string): { gamesPerMatch: number | null; targetScore: number | null } {
@@ -103,10 +123,11 @@ export class SheetScannerService {
       shorthandMatch ??
       this.extractGameFormat(poolFormatLine) ??
       this.extractGameFormat(lines.filter((line) => !/\bplayoffs?\b/i.test(line)).join('\n'));
+    const inferredFormat = match ? null : this.inferTemplateGameFormat(text);
 
     return {
-      gamesPerMatch: match ? Number(match[1]) : null,
-      targetScore: match ? Number(match[2]) : null
+      gamesPerMatch: match ? Number(match[1]) : inferredFormat?.gamesPerMatch ?? null,
+      targetScore: match ? Number(match[2]) : inferredFormat?.targetScore ?? null
     };
   }
 
@@ -157,6 +178,20 @@ export class SheetScannerService {
     return null;
   }
 
+  private inferTemplateGameFormat(text: string): { gamesPerMatch: number; targetScore: number } | null {
+    const normalized = text.toLowerCase();
+
+    if (/\b2\s*(?:games?|sets?)\b/.test(normalized) && /\b15\b/.test(normalized)) {
+      return { gamesPerMatch: 2, targetScore: 15 };
+    }
+
+    if (/\b2\s*(?:games?|sets?)\b/.test(normalized) && /\b11\b/.test(normalized)) {
+      return { gamesPerMatch: 2, targetScore: 11 };
+    }
+
+    return null;
+  }
+
   private detectTeamSeeds(lines: string[]): number[] {
     const seeds = new Set<number>();
 
@@ -176,18 +211,252 @@ export class SheetScannerService {
     teamCount: number | null,
     table = this.extractTeamTable(lines, teamCount)
   ): SheetScanTeam[] {
+    const numberedTeams = this.extractNumberedTeamRowsBeforeSchedule(lines, teamCount);
+
+    if (numberedTeams.length > 0) {
+      return numberedTeams;
+    }
+
     if (table.rows.length > 0) {
-      return table.rows.map((line, index) => ({
-        seed: index + 1,
-        name: this.cleanTeamNameFromTableRow(line, table.hasLevelColumn)
-      }));
+      return table.rows.map((line, index) => {
+        const numberedRow = this.extractNumberedTeamRow(line);
+
+        return {
+          seed: numberedRow?.seed ?? index + 1,
+          name: this.cleanTeamNameFromTableRow(line, table.hasLevelColumn)
+        };
+      });
     }
 
     return this.detectSeededTeamsFallback(lines, teamCount);
   }
 
+  private detectTeamsFromOcrLines(ocrLines: SheetScanOcrLine[], teamCount: number | null): SheetScanTeam[] | null {
+    if (ocrLines.length === 0 || teamCount == null) {
+      return null;
+    }
+
+    const header = this.findTeamHeaderLine(ocrLines);
+    const sectionTop = header ? this.lineBottom(header) : 0;
+    const sectionBottom =
+      this.firstLineYAfter(ocrLines, sectionTop, /\bpool play format\b/i) ??
+      this.firstLineYAfter(ocrLines, sectionTop, /\bwho won\b|\bmatch\s*\d/i) ??
+      Number.POSITIVE_INFINITY;
+    const pageWidth = Math.max(...ocrLines.map((line) => line.bounds.x + line.bounds.width), 1);
+    const boundedTeams = this.detectTeamsFromSeedBounds(ocrLines, teamCount, sectionTop, sectionBottom, header, pageWidth);
+
+    if (boundedTeams) {
+      return boundedTeams;
+    }
+
+    const maxSeed = teamCount;
+    const teams = new Map<number, string | null>();
+
+    for (const line of ocrLines) {
+      if (line.bounds.y <= sectionTop || line.bounds.y >= sectionBottom) {
+        continue;
+      }
+
+      if (!this.isLikelyTeamColumnLine(line, header, pageWidth)) {
+        continue;
+      }
+
+      const row = this.extractFlexibleNumberedTeamRow(line.text);
+
+      if (!row || row.seed < 1 || row.seed > maxSeed) {
+        continue;
+      }
+
+      const name = this.cleanTeamName(row.name);
+
+      if (name) {
+        teams.set(row.seed, name);
+      }
+    }
+
+    if (teams.size < Math.min(teamCount, 2)) {
+      return null;
+    }
+
+    return Array.from({ length: teamCount }, (_, index) => {
+      const seed = index + 1;
+      return {
+        seed,
+        name: teams.get(seed) ?? null
+      };
+    });
+  }
+
+  private detectTeamsFromSeedBounds(
+    ocrLines: SheetScanOcrLine[],
+    teamCount: number,
+    sectionTop: number,
+    sectionBottom: number,
+    header: SheetScanOcrLine | null,
+    pageWidth: number
+  ): SheetScanTeam[] | null {
+    const sectionLines = ocrLines.filter(
+      (line) =>
+        line.bounds.y > sectionTop &&
+        line.bounds.y < sectionBottom &&
+        this.isLikelyTeamColumnLine(line, header, pageWidth)
+    );
+    const seedRows = new Map<number, SheetScanOcrLine>();
+
+    for (const line of sectionLines) {
+      const row = this.extractFlexibleNumberedTeamRow(line.text);
+
+      if (row && row.seed >= 1 && row.seed <= teamCount && !seedRows.has(row.seed)) {
+        seedRows.set(row.seed, line);
+      }
+    }
+
+    const firstSeedLine = seedRows.get(1);
+    const lastSeedLine = seedRows.get(teamCount);
+
+    if (!firstSeedLine || !lastSeedLine) {
+      return null;
+    }
+
+    const zone = this.teamZoneBounds(firstSeedLine, lastSeedLine, [...seedRows.values()]);
+    const rowHeight = zone.height / teamCount;
+
+    if (!Number.isFinite(rowHeight) || rowHeight <= 0) {
+      return null;
+    }
+
+    const teams = Array.from({ length: teamCount }, (_, index) => {
+      const seed = index + 1;
+      const bandTop = zone.y + index * rowHeight;
+      const bandBottom = seed === teamCount ? zone.y + zone.height : bandTop + rowHeight;
+      const bandText = sectionLines
+        .filter((line) => this.lineIntersectsTeamBand(line, zone, bandTop, bandBottom))
+        .sort((left, right) => left.bounds.x - right.bounds.x)
+        .map((line) => line.text)
+        .join(' ');
+      const name = this.cleanTeamName(this.removeLeadingSeed(bandText, seed));
+
+      return {
+        seed,
+        name
+      };
+    });
+
+    const namedTeams = teams.filter((team) => team.name).length;
+    return namedTeams >= Math.min(teamCount, 2) ? teams : null;
+  }
+
+  private teamZoneBounds(
+    firstSeedLine: SheetScanOcrLine,
+    lastSeedLine: SheetScanOcrLine,
+    seedLines: SheetScanOcrLine[]
+  ): SheetScanBounds {
+    const left = firstSeedLine.bounds.x;
+    const top = firstSeedLine.bounds.y;
+    const right = Math.max(this.lineRight(lastSeedLine), ...seedLines.map((line) => this.lineRight(line)));
+    const bottom = this.lineBottom(lastSeedLine);
+
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top
+    };
+  }
+
+  private lineIntersectsTeamBand(
+    line: SheetScanOcrLine,
+    zone: SheetScanBounds,
+    bandTop: number,
+    bandBottom: number
+  ): boolean {
+    const centerY = line.bounds.y + line.bounds.height / 2;
+    const lineRight = this.lineRight(line);
+    const zoneRight = zone.x + zone.width;
+
+    return (
+      centerY >= bandTop &&
+      centerY < bandBottom &&
+      line.bounds.x < zoneRight + 12 &&
+      lineRight > zone.x - 12 &&
+      this.isLikelyTeamBandText(line.text)
+    );
+  }
+
+  private isLikelyTeamBandText(text: string): boolean {
+    return (
+      /[a-z]/i.test(text) &&
+      !/\b(?:date|division|strive|games?\s+(?:won|lost)|point differential|pool play format|who won|refs?)\b/i.test(text)
+    );
+  }
+
+  private removeLeadingSeed(text: string, seed: number): string {
+    return text.replace(new RegExp(`^\\s*[|[\\]({]*\\s*${seed}\\s*[.)\\]-]?\\s*`, 'i'), '');
+  }
+
+  private findTeamHeaderLine(ocrLines: SheetScanOcrLine[]): SheetScanOcrLine | null {
+    return (
+      ocrLines.find((line) => /^team$/i.test(line.text)) ??
+      ocrLines.find((line) => /\bteam\b/i.test(line.text) && !/\b(?:net|pool|games?\s+won|games?\s+lost)\b/i.test(line.text)) ??
+      null
+    );
+  }
+
+  private firstLineYAfter(ocrLines: SheetScanOcrLine[], y: number, pattern: RegExp): number | null {
+    return ocrLines
+      .filter((line) => line.bounds.y > y && pattern.test(line.text))
+      .sort((left, right) => left.bounds.y - right.bounds.y)[0]?.bounds.y ?? null;
+  }
+
+  private isLikelyTeamColumnLine(line: SheetScanOcrLine, header: SheetScanOcrLine | null, pageWidth: number): boolean {
+    if (/\b(?:games?\s+(?:won|lost)|point differential|pool play format|who won|refs?)\b/i.test(line.text)) {
+      return false;
+    }
+
+    if (!header) {
+      return line.bounds.x < pageWidth * 0.65;
+    }
+
+    const headerCenter = header.bounds.x + header.bounds.width / 2;
+    const lineCenter = line.bounds.x + line.bounds.width / 2;
+    const allowedDrift = Math.max(pageWidth * 0.32, header.bounds.width * 2.5);
+
+    return lineCenter <= headerCenter + allowedDrift;
+  }
+
+  private extractNumberedTeamRowsBeforeSchedule(lines: string[], teamCount: number | null): SheetScanTeam[] {
+    const teams = new Map<number, string | null>();
+    const maxSeed = teamCount ?? 7;
+
+    for (const line of lines) {
+      if (/\bpool play format\b|\bwho won\b|\bmatch\s*\d/i.test(line)) {
+        break;
+      }
+
+      const row = this.extractNumberedTeamRow(line);
+
+      if (!row || row.seed < 1 || row.seed > maxSeed) {
+        continue;
+      }
+
+      teams.set(row.seed, this.cleanTeamName(row.name));
+
+      if (teamCount && teams.size >= teamCount) {
+        break;
+      }
+    }
+
+    return Array.from({ length: teamCount ?? teams.size }, (_, index) => {
+      const seed = index + 1;
+      return {
+        seed,
+        name: teams.get(seed) ?? null
+      };
+    }).filter((team) => team.name);
+  }
+
   private extractTeamTable(lines: string[], teamCount: number | null): TeamTable {
-    const headerIndex = lines.findIndex((line) => /\bteam\b.*\bteam\s+name\b/i.test(line));
+    const headerIndex = lines.findIndex((line, index) => this.isTeamTableHeader(lines, index));
 
     if (headerIndex < 0) {
       return {
@@ -209,7 +478,11 @@ export class SheetScannerService {
 
       const line = lines[index];
 
-      if (this.isLikelyTeamTableRow(line)) {
+      if (/\bpool play format\b|\bwho won\b|\bmatch\s*\d/i.test(line)) {
+        break;
+      }
+
+      if (this.extractNumberedTeamRow(line) && this.isLikelyTeamTableRow(line)) {
         rows.push(line);
         consumedIndexes.add(index);
       }
@@ -231,14 +504,57 @@ export class SheetScannerService {
   }
 
   private isLikelyTeamTableRow(line: string): boolean {
-    return !/\b(?:vs|v5|ws)\b/i.test(line) && !/\b(?:competition|playoffs?)\b/i.test(line);
+    return (
+      !/\b(?:games?\s+(?:won|lost)|point differential|for each match|team)\b/i.test(line) &&
+      !/\b(?:vs|v5|ws)\b/i.test(line) &&
+      !/\b(?:competition|playoffs?)\b/i.test(line)
+    );
   }
 
   private cleanTeamNameFromTableRow(line: string, hasLevelColumn: boolean): string | null {
-    const withoutSeedColumn = line.replace(/^\S+\s+/, '');
+    const numberedRow = this.extractNumberedTeamRow(line);
+    const withoutSeedColumn =
+      numberedRow?.name ?? line.replace(/^\s*[|[\]({]*\s*[1-7Il|!]\s*[.)\]-]*\s*/, '');
     const withoutLevelColumn = hasLevelColumn ? withoutSeedColumn.replace(/\s+\S+$/, '') : withoutSeedColumn;
 
     return this.cleanTeamName(withoutLevelColumn);
+  }
+
+  private isTeamTableHeader(lines: string[], index: number): boolean {
+    const window = lines.slice(index, index + 5).join(' ');
+    return /\bteam\b/i.test(window) && /\bgames?\s+won\b/i.test(window);
+  }
+
+  private extractNumberedTeamRow(line: string): { seed: number; name: string } | null {
+    const match = line.match(/^\s*[|[\]({]*\s*([1-7])\s*[.)\]-]+\s*(.+?)\s*$/);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      seed: Number(match[1]),
+      name: match[2]
+    };
+  }
+
+  private extractFlexibleNumberedTeamRow(line: string): { seed: number; name: string } | null {
+    const strictRow = this.extractNumberedTeamRow(line);
+
+    if (strictRow) {
+      return strictRow;
+    }
+
+    const looseMatch = line.match(/^\s*[|[\]({]*\s*([1-7])\s+(.+?)\s*$/);
+
+    if (!looseMatch || !/[a-z]/i.test(looseMatch[2])) {
+      return null;
+    }
+
+    return {
+      seed: Number(looseMatch[1]),
+      name: looseMatch[2]
+    };
   }
 
   private detectSeededTeamsFallback(lines: string[], teamCount: number | null): SheetScanTeam[] {
@@ -366,11 +682,11 @@ export class SheetScannerService {
   private defaultSchedule(teamCount: number | null): SheetScanMatch[] {
     if (teamCount === 4) {
       return [
-        { refSeed: 1, teamASeed: 2, teamBSeed: 4 },
-        { refSeed: 2, teamASeed: 1, teamBSeed: 3 },
-        { refSeed: 3, teamASeed: 1, teamBSeed: 4 },
         { refSeed: 1, teamASeed: 2, teamBSeed: 3 },
-        { refSeed: 2, teamASeed: 3, teamBSeed: 4 },
+        { refSeed: 2, teamASeed: 1, teamBSeed: 4 },
+        { refSeed: 3, teamASeed: 2, teamBSeed: 4 },
+        { refSeed: 2, teamASeed: 1, teamBSeed: 3 },
+        { refSeed: 1, teamASeed: 3, teamBSeed: 4 },
         { refSeed: 4, teamASeed: 1, teamBSeed: 2 }
       ];
     }
@@ -399,6 +715,7 @@ export class SheetScannerService {
       .replace(/\bgames?\s+won\b.*$/i, '')
       .replace(/\bvs\b.*$/i, '')
       .replace(/\bwinner\b.*$/i, '')
+      .replace(/[\]|]+$/g, '')
       .trim();
 
     return cleaned && !/^[|_\-.]+$/.test(cleaned) ? cleaned : null;
@@ -441,11 +758,13 @@ export class SheetScannerService {
 
     return {
       title: typeof scan.title === 'string' && scan.title.trim() ? scan.title.trim() : null,
+      division: typeof scan.division === 'string' && scan.division.trim() ? normalizeDivision(scan.division) : null,
       teamCount,
       gamesPerMatch: this.nullableInteger(scan.gamesPerMatch, 1, 5),
       targetScore: this.nullableInteger(scan.targetScore, 1, 99),
       teams,
       matches,
+      ocrLines: this.normalizeOcrLines(scan.ocrLines),
       notes
     };
   }
@@ -458,5 +777,36 @@ export class SheetScannerService {
     }
 
     return number;
+  }
+
+  private async errorMessage(response: Response): Promise<string> {
+    const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    return body.message || body.error || 'Unable to read the Pool Sheet with Google Vision.';
+  }
+
+  private normalizeOcrLines(lines: SheetScanOcrLine[] | undefined): SheetScanOcrLine[] {
+    return Array.isArray(lines)
+      ? lines
+          .map((line) => ({
+            text: typeof line.text === 'string' ? line.text.replace(/\s+/g, ' ').trim() : '',
+            bounds: {
+              x: Number(line.bounds?.x) || 0,
+              y: Number(line.bounds?.y) || 0,
+              width: Number(line.bounds?.width) || 0,
+              height: Number(line.bounds?.height) || 0
+            },
+            confidence: typeof line.confidence === 'number' ? line.confidence : null
+          }))
+          .filter((line) => line.text)
+          .sort((left, right) => left.bounds.y - right.bounds.y || left.bounds.x - right.bounds.x)
+      : [];
+  }
+
+  private lineBottom(line: SheetScanOcrLine): number {
+    return line.bounds.y + line.bounds.height;
+  }
+
+  private lineRight(line: SheetScanOcrLine): number {
+    return line.bounds.x + line.bounds.width;
   }
 }

@@ -16,11 +16,14 @@ import { DIVISION_OPTIONS, divisionSortIndex, normalizeDivision } from '../util/
 import {
   createDefaultPool,
   createGames,
+  createPresetMatches,
   createTemplateMatches,
   defaultTargetScore,
   defaultCap,
   TEAM_COUNT_OPTIONS
 } from '../util/pool-setup-rules';
+import { SCHEDULE_PRESETS } from '../util/schedule-presets';
+import type { SchedulePreset } from '../util/schedule-presets';
 import { clampWholeNumber, createId, resizeGamesForCount, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 import { buildPoolCard, buildStandings, teamName } from '../util/standings-rules';
 import { applySheetScanToPool, buildScanSummary } from './sheet-scan-mapper';
@@ -50,6 +53,7 @@ export class ScoringEventStateService {
   readonly version = signal(0);
   readonly teamCountOptions = TEAM_COUNT_OPTIONS;
   readonly divisionOptions = DIVISION_OPTIONS;
+  readonly schedulePresets = SCHEDULE_PRESETS;
   readonly realtimeStatus$ = this.realtime.status$;
 
   adminPassword = sessionStorage.getItem(ADMIN_PASSWORD_KEY) ?? '';
@@ -489,12 +493,16 @@ export class ScoringEventStateService {
     this.bump();
 
     try {
-      const body = await this.scanner.scan(pool.imagePreview, (progress) => {
-        this.zone.run(() => {
-          this.scanProgress = this.formatScanProgress(progress.status, progress.progress);
-          this.bump();
-        });
-      });
+      const body = await this.scanner.scan(
+        pool.imagePreview,
+        (progress) => {
+          this.zone.run(() => {
+            this.scanProgress = this.formatScanProgress(progress.status, progress.progress);
+            this.bump();
+          });
+        },
+        this.adminPassword
+      );
 
       this.zone.run(() => {
         this.applySheetScan(pool, body);
@@ -577,6 +585,28 @@ export class ScoringEventStateService {
     pool.matches.push(match);
     this.touchPool(pool);
     this.bump();
+  }
+
+  applySchedulePreset(presetId: string): void {
+    const pool = this.activePool;
+    const preset = this.schedulePresets.find((candidate) => candidate.id === presetId);
+
+    if (!pool || !preset || !this.isAdmin || preset.teamCount !== pool.teamCount) {
+      return;
+    }
+
+    if (this.hasStartedScoring(pool) && !confirm('Changing schedule will replace current matches and scores. Continue?')) {
+      return;
+    }
+
+    pool.matches = createPresetMatches(preset.id, pool.gamesPerMatch);
+    this.expandedMatchId = null;
+    this.touchPool(pool);
+    this.bump();
+  }
+
+  schedulePresetsFor(teamCount: number): SchedulePreset[] {
+    return this.schedulePresets.filter((preset) => preset.teamCount === teamCount);
   }
 
   removeMatch(matchId: string): void {

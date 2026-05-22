@@ -128,9 +128,26 @@
       }
     </div>
 
+    @if (isAdmin) {
+      <div class="schedule-preset-controls">
+        <label>
+          Saved schedule
+          <select
+            [ngModel]="selectedSchedulePresetId"
+            (ngModelChange)="schedulePresetSelected($event)"
+          >
+            <option value="">Choose schedule</option>
+            @for (preset of schedulePresets; track preset.id) {
+              <option [ngValue]="preset.id">{{ preset.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+    }
+
     @if (pool.matches.length) {
       <div class="schedule-rows">
-        @for (match of pool.matches; track match.id; let index = $index) {
+        @for (match of pool.matches; track match.id; let index = $index; let first = $first; let last = $last) {
           <div class="schedule-row">
             <strong>{{ index + 1 }}</strong>
             <label>
@@ -159,6 +176,26 @@
               </select>
             </label>
             @if (isAdmin) {
+              <div class="schedule-reorder-actions">
+                <button
+                  type="button"
+                  class="secondary icon-button"
+                  (click)="matchMoved.emit({ matchId: match.id, direction: -1 })"
+                  [disabled]="first"
+                  aria-label="Move match up"
+                >
+                  &uarr;
+                </button>
+                <button
+                  type="button"
+                  class="secondary icon-button"
+                  (click)="matchMoved.emit({ matchId: match.id, direction: 1 })"
+                  [disabled]="last"
+                  aria-label="Move match down"
+                >
+                  &darr;
+                </button>
+              </div>
               <button type="button" class="danger" (click)="matchRemoved.emit(match.id)">Remove</button>
             }
           </div>
