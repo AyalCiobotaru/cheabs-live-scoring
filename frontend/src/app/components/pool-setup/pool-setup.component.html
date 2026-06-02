@@ -81,9 +81,9 @@
       <div class="pool-format-fields">
         <label>
           Teams
-          <select [ngModel]="pool.teamCount" (ngModelChange)="teamCountChanged.emit($event)" [disabled]="!isAdmin">
+          <select [value]="pool.teamCount" (change)="teamCountSelected($event)" [disabled]="!isAdmin">
             @for (count of teamCountOptions; track count) {
-              <option [ngValue]="count">{{ count }}</option>
+              <option [value]="count">{{ count }}</option>
             }
           </select>
         </label>

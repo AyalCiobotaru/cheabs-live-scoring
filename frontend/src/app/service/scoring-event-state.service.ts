@@ -557,7 +557,7 @@ export class ScoringEventStateService {
 
     pool.gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     pool.targetScore = clampWholeNumber(pool.targetScore, 1, 99);
-    pool.pointCap = clampWholeNumber(pool.pointCap, 1, 99);
+    pool.pointCap = Math.max(pool.targetScore, clampWholeNumber(pool.pointCap, 1, 99));
     pool.matches = pool.matches.map((match) => ({
       ...match,
       games: resizeGamesForCount(match.games, pool.gamesPerMatch).map((game) => this.capGameScore(game, pool.pointCap))
@@ -650,9 +650,7 @@ export class ScoringEventStateService {
     this.persistLocal();
     this.realtime.publishMatch(pool, match);
 
-    if (match.final) {
-      await this.persistFinalMatch(pool, match);
-    }
+    await this.persistMatch(pool, match);
 
     this.bump();
   }
@@ -757,7 +755,7 @@ export class ScoringEventStateService {
     }
   }
 
-  private async persistFinalMatch(pool: PoolState, match: Match): Promise<void> {
+  private async persistMatch(pool: PoolState, match: Match): Promise<void> {
     if (!this.event || this.applyingRemoteState) {
       return;
     }
@@ -765,7 +763,7 @@ export class ScoringEventStateService {
     this.event.updatedAt = new Date().toISOString();
     this.persistLocal();
 
-    const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}/matches/${match.id}/final`, {
+    const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}/matches/${match.id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ match })
@@ -819,7 +817,7 @@ export class ScoringEventStateService {
       return;
     }
 
-    const match = this.normalizeMatch(remote, pool.gamesPerMatch, pool.pointCap);
+    const match = this.normalizeMatch(remote, pool.gamesPerMatch, pool.pointCap, pool.teamCount);
     const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
 
     if (existingIndex < 0 || this.isNewer(match.updatedAt, pool.matches[existingIndex].updatedAt)) {
@@ -904,7 +902,10 @@ export class ScoringEventStateService {
     const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
     const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
-    const pointCap = pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99);
+    const pointCap = Math.max(
+      targetScore,
+      pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99)
+    );
     const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
     const teams = Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
@@ -921,7 +922,7 @@ export class ScoringEventStateService {
       pointCap,
       teams,
       matches: Array.isArray(pool.matches)
-        ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch, pointCap))
+        ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch, pointCap, teamCount))
         : [],
       imagePreview: typeof pool.imagePreview === 'string' ? pool.imagePreview : null,
       updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : null
@@ -941,13 +942,13 @@ export class ScoringEventStateService {
     pool.updatedAt = new Date().toISOString();
   }
 
-  private normalizeMatch(match: Match, gamesPerMatch: number, pointCap = 99): Match {
+  private normalizeMatch(match: Match, gamesPerMatch: number, pointCap = 99, teamCount = 7): Match {
     return {
       ...match,
       id: typeof match.id === 'string' && match.id.trim() ? match.id : createId(),
-      refSeed: seedOrNull(match.refSeed, 7),
-      teamASeed: seedOrNull(match.teamASeed, 7),
-      teamBSeed: seedOrNull(match.teamBSeed, 7),
+      refSeed: seedOrNull(match.refSeed, teamCount),
+      teamASeed: seedOrNull(match.teamASeed, teamCount),
+      teamBSeed: seedOrNull(match.teamBSeed, teamCount),
       games: resizeGamesForCount(match.games ?? [], gamesPerMatch).map((game) => this.capGameScore(game, pointCap)),
       final: Boolean(match.final),
       updatedAt: typeof match.updatedAt === 'string' ? match.updatedAt : null

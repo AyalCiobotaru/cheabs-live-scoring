@@ -17,6 +17,7 @@ export async function handleApiRequest(request, response) {
     const route = `${request.method} ${url.pathname}`;
     const eventMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)$/);
     const poolMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)$/);
+    const matchMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)$/);
     const finalMatch = url.pathname.match(
       /^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)\/final$/
     );
@@ -121,10 +122,11 @@ export async function handleApiRequest(request, response) {
       return json(response, { event });
     }
 
-    if (finalMatch && request.method === 'PUT') {
-      const code = normalizeEventCode(finalMatch[1]);
-      const poolId = decodeURIComponent(finalMatch[2]);
-      const matchId = decodeURIComponent(finalMatch[3]);
+    if ((matchMatch || finalMatch) && request.method === 'PUT') {
+      const routeMatch = matchMatch ?? finalMatch;
+      const code = normalizeEventCode(routeMatch[1]);
+      const poolId = decodeURIComponent(routeMatch[2]);
+      const matchId = decodeURIComponent(routeMatch[3]);
       const payload = await readJson(request);
       const event = await readEvent(code);
 
@@ -142,11 +144,12 @@ export async function handleApiRequest(request, response) {
         {
           ...payload.match,
           id: matchId,
-          final: true,
+          final: finalMatch ? true : Boolean(payload.match?.final),
           updatedAt: new Date().toISOString()
         },
         pool.gamesPerMatch,
-        pool.pointCap
+        pool.pointCap,
+        pool.teamCount
       );
       const existingIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
 
@@ -349,7 +352,11 @@ function sanitizePool(pool) {
   const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
   const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
   const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
-  const pointCap = pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99);
+  const pointCap = Math.max(
+    targetScore,
+    pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99)
+  );
+  const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
 
   return {
     id,
@@ -359,35 +366,36 @@ function sanitizePool(pool) {
     gamesPerMatch,
     targetScore,
     pointCap,
-    teams: Array.isArray(pool.teams)
-      ? pool.teams
-          .map((team, index) => ({
-            seed: clampWholeNumber(team?.seed ?? index + 1, 1, 7),
-            name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${index + 1}`
-          }))
-          .slice(0, teamCount)
+    teams: Array.from({ length: teamCount }, (_, index) => {
+      const seed = index + 1;
+      const team = sourceTeams.find((candidate) => Number(candidate?.seed) === seed);
+
+      return {
+        seed,
+        name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${seed}`
+      };
+    }),
+    matches: Array.isArray(pool.matches)
+      ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch, pointCap, teamCount))
       : [],
-    matches: Array.isArray(pool.matches) ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch, pointCap)) : [],
     imagePreview: null,
     updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
   };
 }
 
-function sanitizeMatch(match, gamesPerMatch, pointCap = 99) {
+function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
+  const sourceGames = Array.isArray(match?.games) ? match.games : [];
+
   return {
     id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
-    refSeed: nullableInteger(match?.refSeed, 1, 7),
-    teamASeed: nullableInteger(match?.teamASeed, 1, 7),
-    teamBSeed: nullableInteger(match?.teamBSeed, 1, 7),
-    games: Array.isArray(match?.games)
-      ? match.games
-          .map((game) => ({
-            scoreA: clampWholeNumber(game?.scoreA, 0, pointCap),
-            scoreB: clampWholeNumber(game?.scoreB, 0, pointCap),
-            final: Boolean(game?.final)
-          }))
-          .slice(0, gamesPerMatch)
-      : [],
+    refSeed: nullableInteger(match?.refSeed, 1, teamCount),
+    teamASeed: nullableInteger(match?.teamASeed, 1, teamCount),
+    teamBSeed: nullableInteger(match?.teamBSeed, 1, teamCount),
+    games: Array.from({ length: gamesPerMatch }, (_, index) => ({
+      scoreA: clampWholeNumber(sourceGames[index]?.scoreA, 0, pointCap),
+      scoreB: clampWholeNumber(sourceGames[index]?.scoreB, 0, pointCap),
+      final: Boolean(sourceGames[index]?.final)
+    })),
     final: Boolean(match?.final),
     updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()
   };

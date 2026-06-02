@@ -25,6 +25,7 @@
                 tabindex="0"
                 (click)="poolSelected.emit(card.pool.id)"
                 (keydown.enter)="poolSelected.emit(card.pool.id)"
+                (keydown.space)="$event.preventDefault(); poolSelected.emit(card.pool.id)"
               >
                 <h4 class="pool-card-title">{{ card.pool.title }}</h4>
                 <app-pool-summary

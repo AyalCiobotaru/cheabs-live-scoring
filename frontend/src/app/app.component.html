@@ -18,22 +18,24 @@
         <h1>Cheabs Live Scoring</h1>
       </div>
       <div class="header-actions">
-        @if (scoring.realtimeStatus$ | async; as realtimeStatus) {
-          <span
-            class="realtime-status"
-            [class.connected]="realtimeStatus === 'connected'"
-            [class.failed]="realtimeStatus === 'failed'"
-          >
-            @if (realtimeStatus === 'connected') {
-              Live sync on
-            } @else if (realtimeStatus === 'disabled') {
-              Local only
-            } @else if (realtimeStatus === 'failed') {
-              Live sync error
-            } @else {
-              Live sync {{ realtimeStatus }}
-            }
-          </span>
+        @if (scoring.event) {
+          @if (scoring.realtimeStatus$ | async; as realtimeStatus) {
+            <span
+              class="realtime-status"
+              [class.connected]="realtimeStatus === 'connected'"
+              [class.failed]="realtimeStatus === 'failed'"
+            >
+              @if (realtimeStatus === 'connected') {
+                Live sync on
+              } @else if (realtimeStatus === 'disabled') {
+                Local only
+              } @else if (realtimeStatus === 'failed') {
+                Live sync error
+              } @else {
+                Live sync {{ realtimeStatus }}
+              }
+            </span>
+          }
         }
       </div>
     </header>

@@ -34,6 +34,12 @@ export class PoolSetupComponent {
 
   selectedSchedulePresetId = '';
 
+  teamCountSelected(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.teamCountChanged.emit(Number(select.value));
+    select.value = String(this.pool.teamCount);
+  }
+
   schedulePresetSelected(presetId: string): void {
     this.selectedSchedulePresetId = presetId;
 
