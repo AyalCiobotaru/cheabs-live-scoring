@@ -122,6 +122,28 @@ export async function handleApiRequest(request, response) {
       return json(response, { event });
     }
 
+    if (poolMatch && request.method === 'DELETE') {
+      requireAdmin(request);
+      const code = normalizeEventCode(poolMatch[1]);
+      const poolId = decodeURIComponent(poolMatch[2]);
+      const event = await readEvent(code);
+
+      if (!event) {
+        throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      }
+
+      if (!event.pools.some((candidate) => candidate.id === poolId)) {
+        throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
+      }
+
+      event.pools = event.pools.filter((candidate) => candidate.id !== poolId);
+      event.activePoolId = event.activePoolId === poolId ? (event.pools[0]?.id ?? null) : event.activePoolId;
+      event.updatedAt = new Date().toISOString();
+      await writeEvent(event);
+      await publishPoolDeleted(event.code, poolId);
+      return json(response, { event });
+    }
+
     if ((matchMatch || finalMatch) && request.method === 'PUT') {
       const routeMatch = matchMatch ?? finalMatch;
       const code = normalizeEventCode(routeMatch[1]);
@@ -231,6 +253,23 @@ async function publishPoolSetup(eventCode, pool) {
     message: 'Scoring pool setup update.',
     updatedAt: new Date().toISOString(),
     pool: stripPoolImage(pool)
+  });
+}
+
+async function publishPoolDeleted(eventCode, poolId) {
+  if (!process.env.ABLY_API_KEY) {
+    return;
+  }
+
+  ablyRest ??= new Rest({ key: process.env.ABLY_API_KEY });
+  const channel = ablyRest.channels.get(eventChannelName(eventCode));
+  await channel.publish('event-update', {
+    clientId: 'server',
+    eventCode,
+    kind: 'pool-deleted',
+    message: 'Scoring pool deleted.',
+    updatedAt: new Date().toISOString(),
+    poolId
   });
 }
 
@@ -660,7 +699,7 @@ function json(response, body, status = 200, extraHeaders = {}) {
 function corsHeaders() {
   return {
     'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'GET,POST,PUT,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'access-control-allow-headers': 'content-type,x-admin-password'
   };
 }

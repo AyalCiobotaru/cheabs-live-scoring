@@ -19,6 +19,7 @@ export class PoolSetupComponent {
   @Input() scanProgress = '';
   @Input() scanSummary: ScanSummary | null = null;
   @Input() scanError = '';
+  @Input() canDeletePool = false;
 
   @Output() sheetCaptured = new EventEmitter<Event>();
   @Output() sheetScanned = new EventEmitter<void>();
@@ -26,6 +27,7 @@ export class PoolSetupComponent {
   @Output() teamCountChanged = new EventEmitter<number>();
   @Output() gameFormatApplied = new EventEmitter<void>();
   @Output() poolSetupSaved = new EventEmitter<void>();
+  @Output() poolDeleted = new EventEmitter<void>();
   @Output() setupCanceled = new EventEmitter<void>();
   @Output() matchAdded = new EventEmitter<void>();
   @Output() matchMoved = new EventEmitter<{ matchId: string; direction: -1 | 1 }>();

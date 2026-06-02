@@ -16,6 +16,7 @@ export class ScoringRealtimeService {
   readonly status$ = new BehaviorSubject<RealtimeStatus>('checking');
   readonly remoteEvent$ = new Subject<EventState>();
   readonly remotePoolSetup$ = new Subject<PoolState>();
+  readonly remotePoolDeleted$ = new Subject<string>();
   readonly remoteMatch$ = new Subject<{ poolId: string; match: Match }>();
   readonly snapshotRequest$ = new Subject<void>();
 
@@ -64,6 +65,8 @@ export class ScoringRealtimeService {
           this.remoteEvent$.next(snapshot.event);
         } else if (snapshot.kind === 'pool-setup-updated' && snapshot.pool) {
           this.remotePoolSetup$.next(snapshot.pool);
+        } else if (snapshot.kind === 'pool-deleted' && snapshot.poolId) {
+          this.remotePoolDeleted$.next(snapshot.poolId);
         } else if (snapshot.kind === 'match-updated' && snapshot.poolId && snapshot.match) {
           this.remoteMatch$.next({ poolId: snapshot.poolId, match: snapshot.match });
         } else if (snapshot.kind === 'event-snapshot-request') {

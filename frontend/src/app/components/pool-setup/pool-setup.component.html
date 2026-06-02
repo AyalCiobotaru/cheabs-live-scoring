@@ -107,6 +107,9 @@
     @if (isAdmin) {
       <button type="button" (click)="poolSetupSaved.emit()">Save pool setup</button>
       <button type="button" class="secondary" (click)="setupCanceled.emit()">Cancel</button>
+      @if (canDeletePool) {
+        <button type="button" class="danger" (click)="poolDeleted.emit()">Delete pool</button>
+      }
     }
   </div>
 

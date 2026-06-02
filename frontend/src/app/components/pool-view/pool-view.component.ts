@@ -32,6 +32,7 @@ export class PoolViewComponent {
   @Input({ required: true }) isAdmin = false;
 
   @Output() editSetup = new EventEmitter<void>();
+  @Output() poolDeleted = new EventEmitter<void>();
   @Output() expandedChange = new EventEmitter<MatchExpandedChange>();
   @Output() scoreChanged = new EventEmitter<MatchScoreChange>();
   @Output() finalChanged = new EventEmitter<Match>();

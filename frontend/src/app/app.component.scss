@@ -220,6 +220,13 @@ h4 {
   border-color: #9db1c8;
 }
 
+.pool-card-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
 .pool-card-title {
   color: #143f6b;
   font-size: 18px;
@@ -227,6 +234,10 @@ h4 {
   line-height: 1.2;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.pool-card-delete {
+  flex: 0 0 auto;
 }
 
 .event-title p,

@@ -27,7 +27,20 @@
                 (keydown.enter)="poolSelected.emit(card.pool.id)"
                 (keydown.space)="$event.preventDefault(); poolSelected.emit(card.pool.id)"
               >
-                <h4 class="pool-card-title">{{ card.pool.title }}</h4>
+                <div class="pool-card-heading">
+                  <h4 class="pool-card-title">{{ card.pool.title }}</h4>
+                  @if (isAdmin) {
+                    <button
+                      type="button"
+                      class="danger icon-button pool-card-delete"
+                      aria-label="Delete pool"
+                      title="Delete pool"
+                      (click)="$event.stopPropagation(); poolDeleted.emit(card.pool.id)"
+                    >
+                      &times;
+                    </button>
+                  }
+                </div>
                 <app-pool-summary
                   [pool]="card.pool"
                   [standings]="card.standings"

@@ -7,6 +7,7 @@
     [expandedMatchId]="scoring.expandedMatchId"
     [isAdmin]="scoring.isAdmin"
     (editSetup)="scoring.editPoolSetup()"
+    (poolDeleted)="scoring.deleteActivePool()"
     (expandedChange)="handleExpandedChange($event)"
     (scoreChanged)="handleMatchScoreChanged($event)"
     (finalChanged)="scoring.handleFinalChanged($event)"

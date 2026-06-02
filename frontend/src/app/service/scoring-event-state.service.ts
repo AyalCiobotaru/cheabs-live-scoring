@@ -42,6 +42,7 @@ interface SideSwitchToast {
 export class ScoringEventStateService {
   private remoteSubscription?: Subscription;
   private remotePoolSetupSubscription?: Subscription;
+  private remotePoolDeletedSubscription?: Subscription;
   private remoteMatchSubscription?: Subscription;
   private snapshotRequestSubscription?: Subscription;
   private applyingRemoteState = false;
@@ -94,6 +95,9 @@ export class ScoringEventStateService {
     this.remotePoolSetupSubscription = this.realtime.remotePoolSetup$.subscribe((pool) => {
       this.zone.run(() => this.applyRemotePoolSetup(pool));
     });
+    this.remotePoolDeletedSubscription = this.realtime.remotePoolDeleted$.subscribe((poolId) => {
+      this.zone.run(() => this.applyRemotePoolDeleted(poolId));
+    });
     this.remoteMatchSubscription = this.realtime.remoteMatch$.subscribe(({ poolId, match }) => {
       this.zone.run(() => this.applyRemoteMatch(poolId, match));
     });
@@ -107,10 +111,12 @@ export class ScoringEventStateService {
   destroy(): void {
     this.remoteSubscription?.unsubscribe();
     this.remotePoolSetupSubscription?.unsubscribe();
+    this.remotePoolDeletedSubscription?.unsubscribe();
     this.remoteMatchSubscription?.unsubscribe();
     this.snapshotRequestSubscription?.unsubscribe();
     this.remoteSubscription = undefined;
     this.remotePoolSetupSubscription = undefined;
+    this.remotePoolDeletedSubscription = undefined;
     this.remoteMatchSubscription = undefined;
     this.snapshotRequestSubscription = undefined;
     this.initialized = false;
@@ -170,6 +176,10 @@ export class ScoringEventStateService {
 
   get hasPool(): boolean {
     return Boolean(this.activePool?.matches.length);
+  }
+
+  get canDeleteActivePool(): boolean {
+    return Boolean(this.draftPool && this.event?.pools.some((pool) => pool.id === this.draftPool?.id));
   }
 
   async loadEvent(eventCode: string): Promise<void> {
@@ -447,6 +457,67 @@ export class ScoringEventStateService {
     await this.persistPoolSetup(pool);
     this.draftPool = null;
     void this.router.navigate(['/events', this.event.code, 'pools', pool.id]);
+    this.bump();
+  }
+
+  async deletePoolSetup(): Promise<void> {
+    const pool = this.draftPool;
+
+    if (!this.event || !pool || !this.isAdmin || !this.canDeleteActivePool) {
+      return;
+    }
+
+    await this.deletePool(pool);
+  }
+
+  async deleteActivePool(): Promise<void> {
+    const pool = this.activePool;
+
+    if (!pool || !this.isAdmin) {
+      return;
+    }
+
+    await this.deletePool(pool);
+  }
+
+  async deletePoolById(poolId: string): Promise<void> {
+    const pool = this.event?.pools.find((candidate) => candidate.id === poolId);
+
+    if (!pool || !this.isAdmin) {
+      return;
+    }
+
+    await this.deletePool(pool);
+  }
+
+  private async deletePool(pool: PoolState): Promise<void> {
+    if (!this.event || !this.event.pools.some((candidate) => candidate.id === pool.id)) {
+      return;
+    }
+
+    if (!confirm(`Delete ${pool.title}? This permanently removes the pool and its scores from the event.`)) {
+      return;
+    }
+
+    const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}`, {
+      method: 'DELETE',
+      headers: this.adminHeaders()
+    });
+
+    if (!response.ok) {
+      this.eventError = await this.errorMessage(response);
+      this.bump();
+      return;
+    }
+
+    const body = (await response.json()) as { event: EventState };
+    this.event = this.normalizeEvent(body.event);
+    this.activePoolId = this.event.activePoolId;
+    this.draftPool = null;
+    this.expandedMatchId = null;
+    this.resetScanState();
+    this.persistLocal();
+    await this.router.navigate(['/events', this.event.code]);
     this.bump();
   }
 
@@ -803,6 +874,30 @@ export class ScoringEventStateService {
 
     this.persistLocal();
     this.applyingRemoteState = false;
+    this.bump();
+  }
+
+  private applyRemotePoolDeleted(poolId: string): void {
+    if (!this.event || !this.event.pools.some((pool) => pool.id === poolId)) {
+      return;
+    }
+
+    const deletedActivePool = this.activePoolId === poolId;
+    this.event.pools = this.event.pools.filter((pool) => pool.id !== poolId);
+    this.event.activePoolId =
+      this.event.activePoolId === poolId ? (this.event.pools[0]?.id ?? null) : this.event.activePoolId;
+
+    if (deletedActivePool) {
+      this.activePoolId = this.event.activePoolId;
+    }
+
+    if (this.draftPool?.id === poolId || deletedActivePool) {
+      this.draftPool = null;
+      this.expandedMatchId = null;
+      void this.router.navigate(['/events', this.event.code]);
+    }
+
+    this.persistLocal();
     this.bump();
   }
 
