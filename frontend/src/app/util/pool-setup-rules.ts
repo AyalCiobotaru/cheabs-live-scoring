@@ -1,37 +1,10 @@
 import { GameScore, Match, PoolState } from '../models';
 import { DIVISION_OPTIONS } from './division-rules';
+import { SCHEDULE_PRESETS } from './schedule-presets';
+import type { SchedulePreset } from './schedule-presets';
 import { createId, seedOrNull } from './scoring-helpers';
 
 export const TEAM_COUNT_OPTIONS = [3, 4, 5, 6, 7];
-
-interface ScheduleTemplateRow {
-  teamASeed: number;
-  teamBSeed: number;
-  refSeed: number;
-}
-
-const DEFAULT_SCHEDULES: Record<number, ScheduleTemplateRow[]> = {
-  4: [
-    { teamASeed: 2, teamBSeed: 4, refSeed: 1 },
-    { teamASeed: 1, teamBSeed: 3, refSeed: 2 },
-    { teamASeed: 1, teamBSeed: 4, refSeed: 3 },
-    { teamASeed: 2, teamBSeed: 3, refSeed: 1 },
-    { teamASeed: 3, teamBSeed: 4, refSeed: 2 },
-    { teamASeed: 1, teamBSeed: 2, refSeed: 4 }
-  ],
-  5: [
-    { teamASeed: 2, teamBSeed: 5, refSeed: 3 },
-    { teamASeed: 1, teamBSeed: 4, refSeed: 2 },
-    { teamASeed: 3, teamBSeed: 5, refSeed: 1 },
-    { teamASeed: 2, teamBSeed: 4, refSeed: 5 },
-    { teamASeed: 1, teamBSeed: 3, refSeed: 4 },
-    { teamASeed: 4, teamBSeed: 5, refSeed: 1 },
-    { teamASeed: 2, teamBSeed: 3, refSeed: 4 },
-    { teamASeed: 1, teamBSeed: 5, refSeed: 2 },
-    { teamASeed: 3, teamBSeed: 4, refSeed: 5 },
-    { teamASeed: 1, teamBSeed: 2, refSeed: 3 }
-  ]
-};
 
 export const createDefaultPool = (title = 'Pool'): PoolState => ({
   id: createId(),
@@ -62,7 +35,7 @@ export const createScannedMatch = (
 });
 
 export const createTemplateMatches = (teamCount: number, gamesPerMatch = 2): Match[] => {
-  const template = DEFAULT_SCHEDULES[teamCount] ?? [];
+  const template = schedulePresetForTeamCount(teamCount)?.rows ?? [];
 
   return template.map((row) => ({
     id: createId(),
@@ -74,6 +47,23 @@ export const createTemplateMatches = (teamCount: number, gamesPerMatch = 2): Mat
     updatedAt: new Date().toISOString()
   }));
 };
+
+export const createPresetMatches = (presetId: string, gamesPerMatch = 2): Match[] => {
+  const preset = SCHEDULE_PRESETS.find((candidate) => candidate.id === presetId);
+
+  return (preset?.rows ?? []).map((row) => ({
+    id: createId(),
+    refSeed: row.refSeed,
+    teamASeed: row.teamASeed,
+    teamBSeed: row.teamBSeed,
+    games: createGames(gamesPerMatch),
+    final: false,
+    updatedAt: new Date().toISOString()
+  }));
+};
+
+export const schedulePresetForTeamCount = (teamCount: number): SchedulePreset | null =>
+  SCHEDULE_PRESETS.find((preset) => preset.teamCount === teamCount) ?? null;
 
 export const createGames = (gamesPerMatch = 2): GameScore[] =>
   Array.from({ length: gamesPerMatch }, () => ({

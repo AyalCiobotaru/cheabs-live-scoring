@@ -41,7 +41,7 @@ export class MatchRowComponent {
   }
 
   updateScore(game: GameScore, side: 'A' | 'B', change: number): void {
-    if (this.match.final) {
+    if (this.match.final || game.final) {
       return;
     }
 
@@ -55,6 +55,10 @@ export class MatchRowComponent {
   }
 
   setScore(game: GameScore, side: 'A' | 'B', value: unknown): void {
+    if (this.match.final || game.final) {
+      return;
+    }
+
     if (side === 'A') {
       game.scoreA = this.capScore(value);
     } else {
@@ -87,11 +91,17 @@ export class MatchRowComponent {
   }
 
   canMarkGameFinal(game: GameScore): boolean {
-    return this.wholeNumber(game.scoreA) !== this.wholeNumber(game.scoreB);
+    const scoreA = this.wholeNumber(game.scoreA);
+    const scoreB = this.wholeNumber(game.scoreB);
+    const winningScore = Math.max(scoreA, scoreB);
+    const targetScore = Math.max(1, this.wholeNumber(this.targetScore));
+    const pointCap = Math.max(targetScore, this.wholeNumber(this.pointCap));
+
+    return winningScore >= targetScore && (Math.abs(scoreA - scoreB) >= 2 || winningScore === pointCap);
   }
 
   canMarkFinal(): boolean {
-    return this.match.games.every((game) => game.final);
+    return this.match.games.length > 0 && this.match.games.every((game) => game.final);
   }
 
   markFinal(): void {

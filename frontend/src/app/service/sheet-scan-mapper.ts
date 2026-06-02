@@ -1,5 +1,6 @@
 import { PoolState, ScanSummary, SheetScanResult } from '../models';
 import { createScannedMatch, createTemplateMatches, defaultCap, defaultTargetScore } from '../util/pool-setup-rules';
+import { normalizeDivision } from '../util/division-rules';
 import { clampWholeNumber, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 
 export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, title: string): PoolState => {
@@ -12,6 +13,7 @@ export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, tit
   return {
     ...pool,
     title,
+    division: scan.division == null ? pool.division : normalizeDivision(scan.division),
     teamCount,
     gamesPerMatch,
     targetScore,
@@ -46,6 +48,7 @@ export const buildScanSummary = (pool: PoolState, scan: SheetScanResult): ScanSu
   return {
     read: [
       scan.title?.trim() ? `Title: ${scan.title.trim()}` : '',
+      scan.division?.trim() ? `Division: ${scan.division.trim()}` : '',
       scan.teamCount != null ? `Team count: ${scan.teamCount}` : '',
       scan.gamesPerMatch != null && scan.targetScore != null
         ? `Format: ${scan.gamesPerMatch} games to ${scan.targetScore}`

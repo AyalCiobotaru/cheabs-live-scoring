@@ -422,19 +422,40 @@ button:disabled {
   gap: 10px;
 }
 
+.schedule-preset-controls {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .schedule-row {
   align-items: end;
   border: 1px solid #e3e9f1;
   border-radius: 4px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 32px repeat(3, minmax(90px, 1fr)) auto;
+  grid-template-columns: 32px repeat(3, minmax(90px, 1fr)) auto auto;
   padding: 10px;
 }
 
 .schedule-row strong {
   align-self: center;
   color: #526071;
+}
+
+.schedule-reorder-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-button {
+  align-items: center;
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  width: 40px;
 }
 
 .standings {
@@ -506,6 +527,11 @@ app-match-row {
   .schedule-row strong {
     align-self: auto;
   }
+
+  .schedule-reorder-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 40px);
+  }
 }
 
 @media (max-width: 620px) {
@@ -527,7 +553,8 @@ app-match-row {
   }
 
   .inline-fields,
-  .inline-fields:first-of-type {
+  .inline-fields:first-of-type,
+  .schedule-preset-controls {
     grid-template-columns: 1fr;
   }
 

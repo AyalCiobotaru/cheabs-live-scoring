@@ -1,4 +1,10 @@
-<button type="button" class="menu-button" aria-label="Open menu" [attr.aria-expanded]="menuOpen" (click)="toggleMenu()">
+<button
+  type="button"
+  class="menu-button"
+  [attr.aria-label]="menuOpen ? 'Close menu' : 'Open menu'"
+  [attr.aria-expanded]="menuOpen"
+  (click)="toggleMenu()"
+>
   <span aria-hidden="true">&#9776;</span>
 </button>
 
