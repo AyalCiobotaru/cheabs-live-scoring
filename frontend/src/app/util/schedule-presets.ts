@@ -55,6 +55,20 @@ export const SCHEDULE_PRESETS: SchedulePreset[] = [
     
   },
   {
+    id: '4-team-alt-2',
+    label: '4 Team Alt 2 (ViP)',
+    teamCount: 4,
+    rows: [
+      { teamASeed: 2, teamBSeed: 4, refSeed: 1 },
+      { teamASeed: 1, teamBSeed: 3, refSeed: 2 },
+      { teamASeed: 2, teamBSeed: 3, refSeed: 4 },
+      { teamASeed: 1, teamBSeed: 4, refSeed: 2 },
+      { teamASeed: 3, teamBSeed: 4, refSeed: 1 },
+      { teamASeed: 1, teamBSeed: 2, refSeed: 3 }
+    ]
+    
+  },
+  {
     id: '5-team-standard',
     label: '5 Team Standard',
     teamCount: 5,
