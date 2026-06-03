@@ -15,7 +15,7 @@ export class MatchRowComponent {
   @Input({ required: true }) teams: Team[] = [];
   @Input({ required: true }) index = 0;
   @Input({ required: true }) targetScore = 25;
-  @Input({ required: true }) pointCap = 25;
+  @Input({ required: true }) pointCap: number | null = 25;
   @Input() expanded = false;
   @Input() first = false;
   @Input() last = false;
@@ -95,7 +95,7 @@ export class MatchRowComponent {
     const scoreB = this.wholeNumber(game.scoreB);
     const winningScore = Math.max(scoreA, scoreB);
     const targetScore = Math.max(1, this.wholeNumber(this.targetScore));
-    const pointCap = Math.max(targetScore, this.wholeNumber(this.pointCap));
+    const pointCap = this.normalizedPointCap(targetScore);
 
     return winningScore >= targetScore && (Math.abs(scoreA - scoreB) >= 2 || winningScore === pointCap);
   }
@@ -126,7 +126,11 @@ export class MatchRowComponent {
   }
 
   private capScore(value: unknown): number {
-    const cap = Math.max(1, this.wholeNumber(this.pointCap));
+    const cap = this.normalizedPointCap(1) ?? 99;
     return Math.min(cap, Math.max(0, this.wholeNumber(value)));
+  }
+
+  private normalizedPointCap(minimum: number): number | null {
+    return this.pointCap == null ? null : Math.max(minimum, this.wholeNumber(this.pointCap));
   }
 }

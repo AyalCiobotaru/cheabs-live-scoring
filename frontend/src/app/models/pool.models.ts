@@ -26,7 +26,7 @@ export interface PoolState {
   teamCount: number;
   gamesPerMatch: number;
   targetScore: number;
-  pointCap: number;
+  pointCap: number | null;
   teams: Team[];
   matches: Match[];
   imagePreview: string | null;

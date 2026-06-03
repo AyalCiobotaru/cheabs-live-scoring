@@ -391,10 +391,7 @@ function sanitizePool(pool) {
   const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
   const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
   const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
-  const pointCap = Math.max(
-    targetScore,
-    pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99)
-  );
+  const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
   const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
 
   return {
@@ -424,6 +421,7 @@ function sanitizePool(pool) {
 
 function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
   const sourceGames = Array.isArray(match?.games) ? match.games : [];
+  const scoreCap = pointCap == null ? 99 : pointCap;
 
   return {
     id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
@@ -431,8 +429,8 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
     teamASeed: nullableInteger(match?.teamASeed, 1, teamCount),
     teamBSeed: nullableInteger(match?.teamBSeed, 1, teamCount),
     games: Array.from({ length: gamesPerMatch }, (_, index) => ({
-      scoreA: clampWholeNumber(sourceGames[index]?.scoreA, 0, pointCap),
-      scoreB: clampWholeNumber(sourceGames[index]?.scoreB, 0, pointCap),
+      scoreA: clampWholeNumber(sourceGames[index]?.scoreA, 0, scoreCap),
+      scoreB: clampWholeNumber(sourceGames[index]?.scoreB, 0, scoreCap),
       final: Boolean(sourceGames[index]?.final)
     })),
     final: Boolean(match?.final),

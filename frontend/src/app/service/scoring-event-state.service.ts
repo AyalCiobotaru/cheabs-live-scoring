@@ -628,7 +628,7 @@ export class ScoringEventStateService {
 
     pool.gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     pool.targetScore = clampWholeNumber(pool.targetScore, 1, 99);
-    pool.pointCap = Math.max(pool.targetScore, clampWholeNumber(pool.pointCap, 1, 99));
+    pool.pointCap = pool.pointCap == null ? null : Math.max(pool.targetScore, clampWholeNumber(pool.pointCap, 1, 99));
     pool.matches = pool.matches.map((match) => ({
       ...match,
       games: resizeGamesForCount(match.games, pool.gamesPerMatch).map((game) => this.capGameScore(game, pool.pointCap))
@@ -997,10 +997,7 @@ export class ScoringEventStateService {
     const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
     const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
-    const pointCap = Math.max(
-      targetScore,
-      pool.pointCap == null ? defaultCap(teamCount) : clampWholeNumber(pool.pointCap, 1, 99)
-    );
+    const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
     const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
     const teams = Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
@@ -1037,7 +1034,7 @@ export class ScoringEventStateService {
     pool.updatedAt = new Date().toISOString();
   }
 
-  private normalizeMatch(match: Match, gamesPerMatch: number, pointCap = 99, teamCount = 7): Match {
+  private normalizeMatch(match: Match, gamesPerMatch: number, pointCap: number | null = 99, teamCount = 7): Match {
     return {
       ...match,
       id: typeof match.id === 'string' && match.id.trim() ? match.id : createId(),
@@ -1050,8 +1047,8 @@ export class ScoringEventStateService {
     };
   }
 
-  private capGameScore(game: GameScore, pointCap: number): GameScore {
-    const cap = clampWholeNumber(pointCap, 1, 99);
+  private capGameScore(game: GameScore, pointCap: number | null): GameScore {
+    const cap = pointCap == null ? 99 : clampWholeNumber(pointCap, 1, 99);
     game.scoreA = clampWholeNumber(game.scoreA, 0, cap);
     game.scoreB = clampWholeNumber(game.scoreB, 0, cap);
     game.final = Boolean(game.final);

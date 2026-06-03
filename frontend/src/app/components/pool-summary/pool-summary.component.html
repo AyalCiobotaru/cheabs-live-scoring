@@ -4,7 +4,7 @@
       <p>{{ completedMatches }} / {{ totalMatches }} matches finished</p>
       <h4>
         {{ pool.gamesPerMatch }} set{{ pool.gamesPerMatch === 1 ? '' : 's' }} to {{ pool.targetScore }}, cap
-        {{ pool.pointCap }}
+        {{ capLabel() }}
       </h4>
     </div>
   </header>

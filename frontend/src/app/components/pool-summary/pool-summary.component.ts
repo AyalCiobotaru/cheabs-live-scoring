@@ -13,4 +13,8 @@ export class PoolSummaryComponent {
   @Input({ required: true }) matchSummary = '';
   @Input({ required: true }) completedMatches = 0;
   @Input({ required: true }) totalMatches = 0;
+
+  capLabel(): string {
+    return this.pool.pointCap == null ? 'No Cap' : String(this.pool.pointCap);
+  }
 }
