@@ -7,6 +7,7 @@ import {
   GameScore,
   Match,
   PoolCard,
+  PoolTimerUpdate,
   PoolState,
   ScanSummary,
   SheetScanResult,
@@ -44,6 +45,7 @@ export class ScoringEventStateService {
   private remotePoolSetupSubscription?: Subscription;
   private remotePoolDeletedSubscription?: Subscription;
   private remoteMatchSubscription?: Subscription;
+  private remotePoolTimerSubscription?: Subscription;
   private snapshotRequestSubscription?: Subscription;
   private applyingRemoteState = false;
   private initialized = false;
@@ -101,6 +103,9 @@ export class ScoringEventStateService {
     this.remoteMatchSubscription = this.realtime.remoteMatch$.subscribe(({ poolId, match }) => {
       this.zone.run(() => this.applyRemoteMatch(poolId, match));
     });
+    this.remotePoolTimerSubscription = this.realtime.remotePoolTimer$.subscribe(({ poolId, timer }) => {
+      this.zone.run(() => this.applyRemotePoolTimer(poolId, timer));
+    });
     this.snapshotRequestSubscription = this.realtime.snapshotRequest$.subscribe(() => {
       if (this.event) {
         this.realtime.publishSnapshot(this.eventWithoutImages(this.event));
@@ -113,11 +118,13 @@ export class ScoringEventStateService {
     this.remotePoolSetupSubscription?.unsubscribe();
     this.remotePoolDeletedSubscription?.unsubscribe();
     this.remoteMatchSubscription?.unsubscribe();
+    this.remotePoolTimerSubscription?.unsubscribe();
     this.snapshotRequestSubscription?.unsubscribe();
     this.remoteSubscription = undefined;
     this.remotePoolSetupSubscription = undefined;
     this.remotePoolDeletedSubscription = undefined;
     this.remoteMatchSubscription = undefined;
+    this.remotePoolTimerSubscription = undefined;
     this.snapshotRequestSubscription = undefined;
     this.initialized = false;
     this.realtime.close();
@@ -381,10 +388,6 @@ export class ScoringEventStateService {
       return;
     }
 
-    if (this.draftPool && this.activePoolId == null) {
-      return;
-    }
-
     this.draftPool = createDefaultPool(this.nextPoolTitle());
     this.activePoolId = null;
     this.resetScanState();
@@ -457,6 +460,20 @@ export class ScoringEventStateService {
     await this.persistPoolSetup(pool);
     this.draftPool = null;
     void this.router.navigate(['/events', this.event.code, 'pools', pool.id]);
+    this.bump();
+  }
+
+  openPoolTimer(poolId: string): void {
+    if (!this.event) {
+      return;
+    }
+
+    this.activePoolId = poolId;
+    this.event.activePoolId = poolId;
+    this.draftPool = null;
+    this.expandedMatchId = null;
+    this.persistLocal();
+    void this.router.navigate(['/events', this.event.code, 'pools', poolId, 'timer']);
     this.bump();
   }
 
@@ -717,17 +734,40 @@ export class ScoringEventStateService {
       return;
     }
 
+    let timerAction: 'start' | 'clear' | undefined;
+
+    if (match.final && this.shouldStartPoolTimer(pool, match)) {
+      this.startPoolTimer(pool, match);
+      timerAction = 'start';
+    } else if (!match.final && pool.nextMatchStartSourceMatchId === match.id && this.clearPoolTimer(pool)) {
+      timerAction = 'clear';
+    }
+
     this.touchMatch(pool, match);
     this.persistLocal();
     this.realtime.publishMatch(pool, match);
+    if (timerAction) {
+      this.realtime.publishPoolTimer(pool);
+    }
 
-    await this.persistMatch(pool, match);
+    await this.persistMatch(pool, match, timerAction);
 
     this.bump();
   }
 
   setExpanded(matchId: string, expanded: boolean): void {
+    const pool = this.activePool;
+    const match = pool?.matches.find((candidate) => candidate.id === matchId);
+
     this.expandedMatchId = expanded ? matchId : null;
+
+    if (expanded && pool && match && this.clearPoolTimer(pool)) {
+      this.touchPool(pool);
+      this.persistLocal();
+      this.realtime.publishPoolTimer(pool);
+      void this.persistMatch(pool, match, 'clear');
+    }
+
     this.bump();
   }
 
@@ -826,7 +866,7 @@ export class ScoringEventStateService {
     }
   }
 
-  private async persistMatch(pool: PoolState, match: Match): Promise<void> {
+  private async persistMatch(pool: PoolState, match: Match, timerAction?: 'start' | 'clear'): Promise<void> {
     if (!this.event || this.applyingRemoteState) {
       return;
     }
@@ -837,7 +877,7 @@ export class ScoringEventStateService {
     const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}/matches/${match.id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ match })
+      body: JSON.stringify({ match, timerAction })
     });
 
     if (!response.ok) {
@@ -929,6 +969,29 @@ export class ScoringEventStateService {
     }
   }
 
+  private applyRemotePoolTimer(poolId: string, timer: PoolTimerUpdate): void {
+    if (!this.event) {
+      return;
+    }
+
+    const pool = this.event.pools.find((candidate) => candidate.id === poolId);
+
+    if (!pool) {
+      return;
+    }
+
+    this.applyingRemoteState = true;
+    pool.nextMatchStartAt = typeof timer.nextMatchStartAt === 'string' ? timer.nextMatchStartAt : null;
+    pool.nextMatchStartSourceMatchId =
+      pool.nextMatchStartAt && typeof timer.nextMatchStartSourceMatchId === 'string'
+        ? timer.nextMatchStartSourceMatchId
+        : null;
+    this.touchPool(pool);
+    this.persistLocal();
+    this.applyingRemoteState = false;
+    this.bump();
+  }
+
   private mergeEvents(local: EventState, remote: EventState): EventState {
     const pools = new Map<string, PoolState>();
 
@@ -998,6 +1061,13 @@ export class ScoringEventStateService {
     const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
     const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
     const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
+    const matchStartTimerMinutes = clampWholeNumber(pool.matchStartTimerMinutes ?? 10, 0, 99);
+    const nextMatchStartAt =
+      matchStartTimerMinutes > 0 && typeof pool.nextMatchStartAt === 'string' ? pool.nextMatchStartAt : null;
+    const nextMatchStartSourceMatchId =
+      nextMatchStartAt && typeof pool.nextMatchStartSourceMatchId === 'string'
+        ? pool.nextMatchStartSourceMatchId
+        : null;
     const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
     const teams = Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
@@ -1012,6 +1082,9 @@ export class ScoringEventStateService {
       gamesPerMatch,
       targetScore,
       pointCap,
+      matchStartTimerMinutes,
+      nextMatchStartAt,
+      nextMatchStartSourceMatchId,
       teams,
       matches: Array.isArray(pool.matches)
         ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch, pointCap, teamCount))
@@ -1031,7 +1104,34 @@ export class ScoringEventStateService {
   }
 
   private touchPool(pool: PoolState): void {
+    pool.matchStartTimerMinutes = clampWholeNumber(pool.matchStartTimerMinutes, 0, 99);
+    if (pool.matchStartTimerMinutes === 0) {
+      this.clearPoolTimer(pool);
+    }
     pool.updatedAt = new Date().toISOString();
+  }
+
+  private startPoolTimer(pool: PoolState, match: Match): void {
+    pool.nextMatchStartAt = new Date(Date.now() + pool.matchStartTimerMinutes * 60_000).toISOString();
+    pool.nextMatchStartSourceMatchId = match.id;
+  }
+
+  private clearPoolTimer(pool: PoolState): boolean {
+    if (!pool.nextMatchStartAt && !pool.nextMatchStartSourceMatchId) {
+      return false;
+    }
+
+    pool.nextMatchStartAt = null;
+    pool.nextMatchStartSourceMatchId = null;
+    return true;
+  }
+
+  private shouldStartPoolTimer(pool: PoolState, match: Match): boolean {
+    return (
+      pool.matchStartTimerMinutes > 0 &&
+      pool.matches.findIndex((candidate) => candidate.id === match.id) >= 0 &&
+      pool.matches.findIndex((candidate) => candidate.id === match.id) < pool.matches.length - 1
+    );
   }
 
   private normalizeMatch(match: Match, gamesPerMatch: number, pointCap: number | null = 99, teamCount = 7): Match {

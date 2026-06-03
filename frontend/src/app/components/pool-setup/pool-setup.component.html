@@ -101,6 +101,10 @@
           Cap
           <input type="number" min="1" max="99" [(ngModel)]="pool.pointCap" [disabled]="!isAdmin" />
         </label>
+        <label>
+          Minutes between matches
+          <input type="number" min="0" max="99" [(ngModel)]="pool.matchStartTimerMinutes" [disabled]="!isAdmin" />
+        </label>
       </div>
       <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
     </div>

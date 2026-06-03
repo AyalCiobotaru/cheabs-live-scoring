@@ -7,6 +7,7 @@
     [visibleDivisionPoolGroups]="scoring.visibleDivisionPoolGroups"
     (addPool)="scoring.startAddPool()"
     (poolSelected)="scoring.openPool($event)"
+    (timerSelected)="scoring.openPoolTimer($event)"
     (poolDeleted)="scoring.deletePoolById($event)"
   ></app-event-dashboard>
 }

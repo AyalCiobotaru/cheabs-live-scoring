@@ -179,11 +179,16 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Match not found.', 'ERR_MATCH_NOT_FOUND');
       }
 
+      const timerBefore = poolTimerUpdate(pool);
       pool.matches = pool.matches.map((candidate) => (candidate.id === match.id ? match : candidate));
+      applyMatchTimerAction(pool, match, payload.timerAction);
       pool.updatedAt = match.updatedAt;
       event.updatedAt = match.updatedAt;
       await writeEvent(event);
       await publishMatch(event.code, pool.id, match);
+      if (!sameTimerUpdate(timerBefore, poolTimerUpdate(pool))) {
+        await publishPoolTimer(event.code, pool.id, poolTimerUpdate(pool));
+      }
       return json(response, { event, match });
     }
 
@@ -291,6 +296,24 @@ async function publishMatch(eventCode, poolId, match) {
   });
 }
 
+async function publishPoolTimer(eventCode, poolId, timer) {
+  if (!process.env.ABLY_API_KEY) {
+    return;
+  }
+
+  ablyRest ??= new Rest({ key: process.env.ABLY_API_KEY });
+  const channel = ablyRest.channels.get(eventChannelName(eventCode));
+  await channel.publish('event-update', {
+    clientId: 'server',
+    eventCode,
+    kind: 'pool-timer-updated',
+    message: 'Scoring pool timer update.',
+    updatedAt: new Date().toISOString(),
+    poolId,
+    timer
+  });
+}
+
 async function readEvent(code) {
   const result = await redisCommand(['GET', eventKey(code)]);
 
@@ -392,7 +415,12 @@ function sanitizePool(pool) {
   const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
   const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
   const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
+  const matchStartTimerMinutes = clampWholeNumber(pool.matchStartTimerMinutes ?? 10, 0, 99);
   const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
+  const nextMatchStartAt =
+    matchStartTimerMinutes > 0 && typeof pool.nextMatchStartAt === 'string' ? pool.nextMatchStartAt : null;
+  const nextMatchStartSourceMatchId =
+    nextMatchStartAt && typeof pool.nextMatchStartSourceMatchId === 'string' ? pool.nextMatchStartSourceMatchId : null;
 
   return {
     id,
@@ -402,6 +430,9 @@ function sanitizePool(pool) {
     gamesPerMatch,
     targetScore,
     pointCap,
+    matchStartTimerMinutes,
+    nextMatchStartAt,
+    nextMatchStartSourceMatchId,
     teams: Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
       const team = sourceTeams.find((candidate) => Number(candidate?.seed) === seed);
@@ -417,6 +448,46 @@ function sanitizePool(pool) {
     imagePreview: null,
     updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
   };
+}
+
+function applyMatchTimerAction(pool, match, timerAction) {
+  if (timerAction === 'clear') {
+    clearPoolTimer(pool);
+    return;
+  }
+
+  if (timerAction !== 'start' || !match.final || pool.matchStartTimerMinutes <= 0) {
+    return;
+  }
+
+  const matchIndex = pool.matches.findIndex((candidate) => candidate.id === match.id);
+
+  if (matchIndex < 0 || matchIndex === pool.matches.length - 1) {
+    return;
+  }
+
+  const now = Date.now();
+  pool.nextMatchStartAt = new Date(now + pool.matchStartTimerMinutes * 60_000).toISOString();
+  pool.nextMatchStartSourceMatchId = match.id;
+}
+
+function clearPoolTimer(pool) {
+  pool.nextMatchStartAt = null;
+  pool.nextMatchStartSourceMatchId = null;
+}
+
+function poolTimerUpdate(pool) {
+  return {
+    nextMatchStartAt: pool.nextMatchStartAt ?? null,
+    nextMatchStartSourceMatchId: pool.nextMatchStartSourceMatchId ?? null
+  };
+}
+
+function sameTimerUpdate(left, right) {
+  return (
+    left.nextMatchStartAt === right.nextMatchStartAt &&
+    left.nextMatchStartSourceMatchId === right.nextMatchStartSourceMatchId
+  );
 }
 
 function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {

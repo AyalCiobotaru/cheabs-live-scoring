@@ -8,6 +8,7 @@
     [isAdmin]="scoring.isAdmin"
     (editSetup)="scoring.editPoolSetup()"
     (poolDeleted)="scoring.deleteActivePool()"
+    (timerSelected)="scoring.openPoolTimer(pool.id)"
     (expandedChange)="handleExpandedChange($event)"
     (scoreChanged)="handleMatchScoreChanged($event)"
     (finalChanged)="scoring.handleFinalChanged($event)"

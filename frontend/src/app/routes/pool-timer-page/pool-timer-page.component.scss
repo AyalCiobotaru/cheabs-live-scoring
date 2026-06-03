@@ -1,0 +1,37 @@
+.timer-display {
+  align-items: center;
+  background: #0f172a;
+  color: #f8fafc;
+  display: flex;
+  font-size: 64px;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  min-height: 100vh;
+  overflow-wrap: anywhere;
+  padding: 24px;
+  text-align: center;
+}
+
+@media (min-width: 600px) {
+  .timer-display {
+    font-size: 120px;
+  }
+}
+
+@media (min-width: 1000px) {
+  .timer-display {
+    font-size: 180px;
+  }
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}

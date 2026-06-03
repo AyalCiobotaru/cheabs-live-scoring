@@ -27,6 +27,9 @@ export interface PoolState {
   gamesPerMatch: number;
   targetScore: number;
   pointCap: number | null;
+  matchStartTimerMinutes: number;
+  nextMatchStartAt: string | null;
+  nextMatchStartSourceMatchId: string | null;
   teams: Team[];
   matches: Match[];
   imagePreview: string | null;
