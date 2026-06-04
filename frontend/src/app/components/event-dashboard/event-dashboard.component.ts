@@ -16,5 +16,6 @@ export class EventDashboardComponent {
 
   @Output() addPool = new EventEmitter<void>();
   @Output() poolSelected = new EventEmitter<string>();
+  @Output() timerSelected = new EventEmitter<string>();
   @Output() poolDeleted = new EventEmitter<string>();
 }

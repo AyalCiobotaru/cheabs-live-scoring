@@ -32,6 +32,11 @@ export const routes: Routes = [
         loadComponent: () => import('./routes/pool-page/pool-page.component').then((module) => module.PoolPageComponent)
       },
       {
+        path: 'pools/:poolId/timer',
+        loadComponent: () =>
+          import('./routes/pool-timer-page/pool-timer-page.component').then((module) => module.PoolTimerPageComponent)
+      },
+      {
         path: 'pools/:poolId/setup',
         canActivate: [adminSetupGuard],
         loadComponent: () =>
