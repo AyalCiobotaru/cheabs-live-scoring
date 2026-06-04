@@ -3,6 +3,120 @@ import vision from '@google-cloud/vision';
 
 const EVENT_TTL_SECONDS = 31 * 24 * 60 * 60;
 const DIVISION_OPTIONS = ['Open', 'AA', 'A/AA', 'A', 'BB', 'B/BB', 'B'];
+const CSV_IMPORT_HEADERS = [
+  'event_code',
+  'event_name',
+  'pool_key',
+  'pool_title',
+  'pool_order',
+  'division',
+  'team_count',
+  'games_per_match',
+  'target_score',
+  'point_cap',
+  'schedule_preset',
+  'seed',
+  'team_name'
+];
+const REQUIRED_IMPORT_VALUES = new Set([
+  'event_code',
+  'event_name',
+  'pool_key',
+  'pool_title',
+  'division',
+  'team_count',
+  'seed',
+  'team_name'
+]);
+const IMPORT_POOL_SETTING_COLUMNS = [
+  'pool_title',
+  'pool_order',
+  'division',
+  'team_count',
+  'games_per_match',
+  'target_score',
+  'point_cap',
+  'schedule_preset'
+];
+const IMPORT_NUMERIC_COLUMNS = new Set([
+  'pool_order',
+  'team_count',
+  'games_per_match',
+  'target_score',
+  'point_cap',
+  'seed'
+]);
+const SUPPORTED_TEAM_COUNTS = new Set([3, 4, 5, 6, 7]);
+const STANDARD_SCHEDULES = {
+  3: [
+    [1, 2, 3],
+    [2, 3, 1],
+    [1, 3, 2],
+    [1, 2, 3],
+    [2, 3, 1],
+    [1, 3, 2]
+  ],
+  4: [
+    [2, 4, 1],
+    [1, 3, 2],
+    [1, 4, 3],
+    [2, 3, 1],
+    [3, 4, 2],
+    [1, 2, 4]
+  ],
+  5: [
+    [2, 5, 3],
+    [1, 4, 2],
+    [3, 5, 1],
+    [2, 4, 5],
+    [1, 3, 4],
+    [4, 5, 1],
+    [2, 3, 4],
+    [1, 5, 2],
+    [3, 4, 5],
+    [1, 2, 3]
+  ],
+  6: [
+    [3, 5, 1],
+    [4, 6, 2],
+    [1, 5, 3],
+    [2, 6, 4],
+    [1, 3, 5],
+    [2, 4, 6],
+    [3, 6, 1],
+    [4, 5, 2],
+    [1, 6, 4],
+    [2, 5, 3],
+    [1, 4, 6],
+    [2, 3, 5],
+    [3, 4, 1],
+    [5, 6, 2],
+    [1, 2, 3]
+  ],
+  7: [
+    [2, 7, 1],
+    [3, 5, 4],
+    [1, 7, 2],
+    [4, 6, 3],
+    [2, 5, 1],
+    [3, 6, 7],
+    [1, 4, 5],
+    [3, 7, 6],
+    [1, 5, 4],
+    [2, 6, 3],
+    [4, 5, 7],
+    [6, 7, 5],
+    [1, 3, 2],
+    [5, 7, 6],
+    [2, 4, 3],
+    [1, 6, 5],
+    [2, 3, 4],
+    [5, 6, 1],
+    [4, 7, 2],
+    [1, 2, 6],
+    [3, 4, 7]
+  ]
+};
 
 let ablyRest;
 let visionClient;
@@ -72,6 +186,33 @@ export async function handleApiRequest(request, response) {
       await writeEvent(event);
       await publishEvent(event, 'event-updated');
       return json(response, { event }, 201);
+    }
+
+    if (route === 'POST /api/scoring/events/import') {
+      requireAdmin(request);
+      const payload = await readJson(request);
+      const result = await buildCsvImportEvent(payload);
+
+      if (result.errors.length > 0) {
+        return json(response, { errors: result.errors, warnings: result.warnings }, 400);
+      }
+
+      const existing = await readEvent(result.event.code);
+
+      if (existing) {
+        return json(
+          response,
+          {
+            errors: [{ lineNumber: null, message: 'An event with that code already exists.' }],
+            warnings: result.warnings
+          },
+          409
+        );
+      }
+
+      await writeEvent(result.event);
+      await publishEvent(result.event, 'event-updated');
+      return json(response, { event: result.event, warnings: result.warnings }, 201);
     }
 
     if (eventMatch && request.method === 'GET') {
@@ -436,6 +577,263 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
     final: Boolean(match?.final),
     updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()
   };
+}
+
+async function buildCsvImportEvent(payload) {
+  const rows = Array.isArray(payload?.rows) ? payload.rows.map(normalizeImportRow).filter(Boolean) : [];
+  const errors = [];
+  const warnings = [];
+  const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
+  const eventCodes = uniqueNonEmpty(rows.map((row) => row.values.event_code)).map((code) => normalizeImportCode(code, errors));
+  const eventNames = uniqueNonEmpty(rows.map((row) => row.values.event_name));
+  const pools = new Map();
+  const now = new Date().toISOString();
+
+  if (!fileName.toLowerCase().endsWith('.csv')) {
+    errors.push({ lineNumber: null, message: 'Selected file does not use a .csv extension.' });
+  }
+
+  if (rows.length === 0) {
+    errors.push({ lineNumber: null, message: 'CSV import has no rows.' });
+  }
+
+  for (const row of rows) {
+    for (const required of REQUIRED_IMPORT_VALUES) {
+      if (!row.values[required]) {
+        errors.push({ lineNumber: row.lineNumber, message: `Missing required value "${required}".` });
+      }
+    }
+
+    for (const column of IMPORT_NUMERIC_COLUMNS) {
+      if (row.values[column] && !/^\d+$/.test(row.values[column])) {
+        errors.push({ lineNumber: row.lineNumber, message: `"${column}" must be a whole number.` });
+      }
+    }
+  }
+
+  if (eventCodes.length === 0 || !eventCodes[0]) {
+    errors.push({ lineNumber: null, message: 'Missing event_code.' });
+  } else if (new Set(eventCodes).size > 1) {
+    errors.push({ lineNumber: null, message: 'More than one event_code found.' });
+  }
+
+  if (eventNames.length === 0) {
+    errors.push({ lineNumber: null, message: 'Missing event_name.' });
+  } else if (eventNames.length > 1) {
+    errors.push({ lineNumber: null, message: 'More than one event_name found.' });
+  }
+
+  for (const row of rows) {
+    const key = row.values.pool_key;
+
+    if (!key) {
+      continue;
+    }
+
+    const settings = importSettingsFor(row);
+    const team = importTeamFor(row);
+    const existing = pools.get(key);
+
+    if (!existing) {
+      pools.set(key, {
+        key,
+        firstLineNumber: row.lineNumber,
+        settings,
+        teams: team ? [team] : []
+      });
+      continue;
+    }
+
+    for (const column of IMPORT_POOL_SETTING_COLUMNS) {
+      if ((existing.settings[column] ?? '') !== (settings[column] ?? '')) {
+        errors.push({
+          lineNumber: row.lineNumber,
+          message: `"${column}" conflicts with row ${existing.firstLineNumber} for pool_key "${key}".`
+        });
+      }
+    }
+
+    if (team) {
+      existing.teams.push(team);
+    }
+  }
+
+  const eventPools = [...pools.values()].map((pool) => buildImportedPool(pool, now, errors, warnings));
+  const event = sanitizeEvent(
+    {
+      code: eventCodes[0] ?? '',
+      name: eventNames[0] ?? eventCodes[0] ?? '',
+      pools: eventPools,
+      activePoolId: eventPools[0]?.id ?? null,
+      updatedAt: now
+    },
+    eventCodes[0] || 'IMPORT-ERROR'
+  );
+
+  event.activePoolId = eventPools[0]?.id ?? null;
+
+  return { event, errors, warnings };
+}
+
+function normalizeImportRow(row) {
+  if (!row || typeof row !== 'object') {
+    return null;
+  }
+
+  const values = {};
+  const source = row.values && typeof row.values === 'object' ? row.values : {};
+
+  for (const header of CSV_IMPORT_HEADERS) {
+    values[header] = typeof source[header] === 'string' ? source[header].trim() : '';
+  }
+
+  return {
+    lineNumber: Number.isInteger(row.lineNumber) && row.lineNumber > 0 ? row.lineNumber : null,
+    values
+  };
+}
+
+function normalizeImportCode(value, errors) {
+  try {
+    return normalizeEventCode(value);
+  } catch (error) {
+    errors.push({ lineNumber: null, message: error.message });
+    return '';
+  }
+}
+
+function importSettingsFor(row) {
+  return IMPORT_POOL_SETTING_COLUMNS.reduce((settings, column) => {
+    settings[column] = row.values[column] ?? '';
+    return settings;
+  }, {});
+}
+
+function importTeamFor(row) {
+  const seed = integerOrNull(row.values.seed);
+
+  if (seed == null) {
+    return null;
+  }
+
+  const name = row.values.team_name ?? '';
+
+  return {
+    seed,
+    name,
+    normalizedName: name.trim().replace(/\s+/g, ' ').toLowerCase(),
+    lineNumber: row.lineNumber
+  };
+}
+
+function buildImportedPool(pool, now, errors, warnings) {
+  const teamCount = integerOrNull(pool.settings.team_count) ?? 0;
+  const gamesPerMatch = integerOrNull(pool.settings.games_per_match) ?? 2;
+  const targetScore = integerOrNull(pool.settings.target_score) ?? defaultTargetScore(teamCount);
+  const pointCap = pool.settings.point_cap ? integerOrNull(pool.settings.point_cap) : null;
+  const seeds = new Set();
+  const names = new Set();
+
+  if (!DIVISION_OPTIONS.includes(pool.settings.division)) {
+    errors.push({ lineNumber: pool.firstLineNumber, message: `Unknown division "${pool.settings.division}".` });
+  }
+
+  if (!SUPPORTED_TEAM_COUNTS.has(teamCount)) {
+    errors.push({ lineNumber: pool.firstLineNumber, message: '"team_count" must be one of 3, 4, 5, 6, or 7.' });
+  }
+
+  if (pointCap != null && pointCap < targetScore) {
+    errors.push({ lineNumber: pool.firstLineNumber, message: '"point_cap" must be greater than or equal to target_score.' });
+  }
+
+  if (!pool.settings.games_per_match) {
+    warnings.push({ lineNumber: pool.firstLineNumber, message: 'Blank games_per_match will default to 2.' });
+  }
+
+  if (!pool.settings.target_score) {
+    warnings.push({
+      lineNumber: pool.firstLineNumber,
+      message: `Blank target_score will default to ${defaultTargetScore(teamCount)}.`
+    });
+  }
+
+  if (!pool.settings.point_cap) {
+    warnings.push({ lineNumber: pool.firstLineNumber, message: 'Blank point_cap means no cap.' });
+  }
+
+  if (pool.settings.schedule_preset && pool.settings.schedule_preset !== 'default') {
+    errors.push({ lineNumber: pool.firstLineNumber, message: 'Only schedule_preset "default" is supported in v1.' });
+  }
+
+  for (const team of pool.teams) {
+    if (seeds.has(team.seed)) {
+      errors.push({ lineNumber: team.lineNumber, message: `Duplicate seed ${team.seed} in pool_key "${pool.key}".` });
+    }
+
+    seeds.add(team.seed);
+
+    if (names.has(team.normalizedName)) {
+      warnings.push({ lineNumber: team.lineNumber, message: `Duplicate team_name "${team.name}".` });
+    }
+
+    names.add(team.normalizedName);
+  }
+
+  for (let seed = 1; seed <= teamCount; seed += 1) {
+    if (!seeds.has(seed)) {
+      errors.push({ lineNumber: pool.firstLineNumber, message: `Missing seed ${seed} in pool_key "${pool.key}".` });
+    }
+  }
+
+  if (pool.teams.length > teamCount) {
+    errors.push({ lineNumber: pool.firstLineNumber, message: `More than ${teamCount} teams in pool_key "${pool.key}".` });
+  }
+
+  if (pool.teams.length < teamCount) {
+    errors.push({ lineNumber: pool.firstLineNumber, message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".` });
+  }
+
+  return {
+    id: createId(),
+    title: pool.settings.pool_title || 'Pool',
+    division: pool.settings.division,
+    teamCount,
+    gamesPerMatch,
+    targetScore,
+    pointCap,
+    teams: pool.teams
+      .map(({ seed, name }) => ({ seed, name }))
+      .sort((left, right) => left.seed - right.seed),
+    matches: createTemplateMatches(teamCount, gamesPerMatch, now),
+    imagePreview: null,
+    updatedAt: now
+  };
+}
+
+function createTemplateMatches(teamCount, gamesPerMatch, now) {
+  const rows = STANDARD_SCHEDULES[teamCount] ?? [];
+
+  return rows.map(([teamASeed, teamBSeed, refSeed]) => ({
+    id: createId(),
+    refSeed,
+    teamASeed,
+    teamBSeed,
+    games: Array.from({ length: gamesPerMatch }, () => ({
+      scoreA: 0,
+      scoreB: 0,
+      final: false
+    })),
+    final: false,
+    updatedAt: now
+  }));
+}
+
+function integerOrNull(value) {
+  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
+}
+
+function uniqueNonEmpty(values) {
+  return [...new Set(values.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean))];
 }
 
 function stripEventImages(event) {

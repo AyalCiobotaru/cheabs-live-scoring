@@ -11,6 +11,15 @@ export const routes: Routes = [
     title: 'Cheabs Live Scoring'
   },
   {
+    path: 'import-event',
+    canActivate: [adminSetupGuard],
+    loadComponent: () =>
+      import('./routes/import-event-page/import-event-page.component').then(
+        (module) => module.ImportEventPageComponent
+      ),
+    title: 'Import Event'
+  },
+  {
     path: 'events/:eventCode',
     title: 'Cheabs Live Scoring',
     children: [

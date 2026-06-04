@@ -34,6 +34,7 @@
     >
       {{ scoring.landingMode === 'create' ? 'Join an existing event' : 'Create a new event' }}
     </button>
+    <a class="button-link secondary" routerLink="/import-event">Import event from CSV</a>
     @if (scoring.eventError) {
       <p class="scan-error">{{ scoring.eventError }}</p>
     }

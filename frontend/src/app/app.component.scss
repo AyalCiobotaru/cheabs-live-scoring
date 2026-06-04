@@ -295,7 +295,8 @@ select {
 }
 
 button,
-.camera-button {
+.camera-button,
+.button-link {
   background: #143f6b;
   border: 1px solid #143f6b;
   border-radius: 4px;
@@ -308,8 +309,14 @@ button,
 }
 
 button:hover,
-.camera-button:hover {
+.camera-button:hover,
+.button-link:hover {
   background: #0f3155;
+}
+
+.button-link {
+  display: inline-block;
+  text-decoration: none;
 }
 
 button:disabled {

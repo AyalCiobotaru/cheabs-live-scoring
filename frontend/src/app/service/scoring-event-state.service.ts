@@ -3,6 +3,8 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import {
   DivisionPoolGroup,
+  CsvImportResponse,
+  CsvImportRow,
   EventState,
   GameScore,
   Match,
@@ -224,6 +226,48 @@ export class ScoringEventStateService {
 
   async joinEvent(): Promise<void> {
     await this.loadOrCreateEvent(false);
+  }
+
+  async importEvent(fileName: string, rows: CsvImportRow[]): Promise<CsvImportResponse> {
+    this.eventError = '';
+
+    try {
+      const response = await fetch('/api/scoring/events/import', {
+        method: 'POST',
+        headers: this.adminHeaders(),
+        body: JSON.stringify({ fileName, rows })
+      });
+      const body = (await response.json().catch(() => ({}))) as CsvImportResponse;
+
+      if (!response.ok || !body.event) {
+        return {
+          errors: body.errors ?? [{ lineNumber: null, message: body.message || body.error || 'Import failed.' }],
+          warnings: body.warnings ?? []
+        };
+      }
+
+      this.event = this.normalizeEvent(body.event);
+      this.eventCode = this.event.code;
+      this.eventName = this.event.name;
+      this.activePoolId = this.event.activePoolId;
+      this.draftPool = null;
+      this.persistLocal();
+      await this.router.navigate(['/events', this.event.code]);
+      this.bump();
+      void this.realtime.connect(this.event.code);
+
+      return body;
+    } catch (error) {
+      return {
+        errors: [
+          {
+            lineNumber: null,
+            message: error instanceof Error ? error.message : 'Unable to reach the import endpoint.'
+          }
+        ],
+        warnings: []
+      };
+    }
   }
 
   async adminSignIn(): Promise<void> {
