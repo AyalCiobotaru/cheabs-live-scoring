@@ -388,6 +388,14 @@ export class ScoringEventStateService {
       return;
     }
 
+    if (
+      this.activePoolId === null &&
+      this.draftPool &&
+      !this.event.pools.some((pool) => pool.id === this.draftPool?.id)
+    ) {
+      return;
+    }
+
     this.draftPool = createDefaultPool(this.nextPoolTitle());
     this.activePoolId = null;
     this.resetScanState();
