@@ -1,7 +1,7 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Realtime, type InboundMessage, type RealtimeChannel } from 'ably';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { EventState, Match, PoolState, RealtimeSnapshot } from '../models';
+import { EventState, Match, PoolState, PoolTimerUpdate, RealtimeSnapshot } from '../models';
 
 type RealtimeStatus = 'checking' | 'disabled' | 'connecting' | 'connected' | 'failed';
 
@@ -18,6 +18,7 @@ export class ScoringRealtimeService {
   readonly remotePoolSetup$ = new Subject<PoolState>();
   readonly remotePoolDeleted$ = new Subject<string>();
   readonly remoteMatch$ = new Subject<{ poolId: string; match: Match }>();
+  readonly remotePoolTimer$ = new Subject<{ poolId: string; timer: PoolTimerUpdate }>();
   readonly snapshotRequest$ = new Subject<void>();
 
   constructor(private readonly zone: NgZone) {}
@@ -69,6 +70,8 @@ export class ScoringRealtimeService {
           this.remotePoolDeleted$.next(snapshot.poolId);
         } else if (snapshot.kind === 'match-updated' && snapshot.poolId && snapshot.match) {
           this.remoteMatch$.next({ poolId: snapshot.poolId, match: snapshot.match });
+        } else if (snapshot.kind === 'pool-timer-updated' && snapshot.poolId && snapshot.timer) {
+          this.remotePoolTimer$.next({ poolId: snapshot.poolId, timer: snapshot.timer });
         } else if (snapshot.kind === 'event-snapshot-request') {
           this.snapshotRequest$.next();
         }
@@ -90,6 +93,25 @@ export class ScoringRealtimeService {
       updatedAt: new Date().toISOString(),
       poolId: pool.id,
       match
+    } satisfies RealtimeSnapshot);
+  }
+
+  publishPoolTimer(pool: PoolState): void {
+    if (!this.channel || !this.eventCode) {
+      return;
+    }
+
+    void this.channel.publish(this.updateEventName, {
+      clientId: this.clientId,
+      eventCode: this.eventCode,
+      kind: 'pool-timer-updated',
+      message: 'Scoring pool timer update.',
+      updatedAt: new Date().toISOString(),
+      poolId: pool.id,
+      timer: {
+        nextMatchStartAt: pool.nextMatchStartAt,
+        nextMatchStartSourceMatchId: pool.nextMatchStartSourceMatchId
+      }
     } satisfies RealtimeSnapshot);
   }
 

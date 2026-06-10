@@ -21,6 +21,7 @@
       [matchSummary]="card.matchSummary"
       [completedMatches]="card.completedMatches"
       [totalMatches]="card.totalMatches"
+      (timerSelected)="timerSelected.emit()"
     ></app-pool-summary>
   }
 

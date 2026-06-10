@@ -3,10 +3,16 @@
     <div>
       <p>{{ completedMatches }} / {{ totalMatches }} matches finished</p>
       <h4>
-        {{ pool.gamesPerMatch }} set{{ pool.gamesPerMatch === 1 ? '' : 's' }} to {{ pool.targetScore }}, {{ pool.pointCap === null ? '' : 'cap' }}
-        {{ capLabel() }}
+        {{ pool.gamesPerMatch }} set{{ pool.gamesPerMatch === 1 ? '' : 's' }} to {{ pool.targetScore }},
+        {{ scoreFormatLabel() }}
       </h4>
+      @if (timerStatus(); as status) {
+        <p class="timer-status">{{ status }}</p>
+      }
     </div>
+    @if (showTimerButton()) {
+      <button type="button" class="secondary timer-button" (click)="timerButtonClicked($event)">Timer</button>
+    }
   </header>
   <p class="match-summary">{{ matchSummary }}</p>
   <div class="summary-standings">

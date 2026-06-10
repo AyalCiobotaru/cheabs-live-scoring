@@ -47,6 +47,7 @@
                   [matchSummary]="card.matchSummary"
                   [completedMatches]="card.completedMatches"
                   [totalMatches]="card.totalMatches"
+                  (timerSelected)="timerSelected.emit(card.pool.id)"
                 ></app-pool-summary>
               </article>
             }
