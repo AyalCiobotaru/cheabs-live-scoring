@@ -12,6 +12,10 @@ export const adminSetupGuard: CanActivateFn = (_route, state) => {
 
   scoring.requestAdminRoute(state.url);
 
+  if (state.url === '/import-event') {
+    return router.createUrlTree(['/']);
+  }
+
   const match = state.url.match(/^\/events\/([^/?]+)(?:\/pools\/([^/?]+)\/setup|\/new-pool)/);
 
   if (!match) {

@@ -1,4 +1,5 @@
 <section class="setup-grid">
+  @if (setupMode === 'manual') {
   <div class="setup-panel camera-panel">
     <h2>Pool Sheet</h2>
     @if (isAdmin) {
@@ -62,21 +63,37 @@
       <div class="preview-placeholder">No photo captured</div>
     }
   </div>
+  }
 
-  <div class="setup-panel">
+  <div class="setup-panel" [class.seeded-setup-panel]="setupMode === 'seeded'">
     <h2>Pool Setup</h2>
+    @if (isAdmin) {
+      <div class="mode-toggle">
+        <button type="button" [class.active]="setupMode === 'manual'" (click)="setSetupMode('manual')">Manual pool</button>
+        <button
+          type="button"
+          [class.active]="setupMode === 'seeded'"
+          (click)="setSetupMode('seeded')"
+          [disabled]="!seededImportEnabled"
+          title="Seeded import is only available when creating pools."
+        >
+          Seeded import
+        </button>
+      </div>
+    }
     <label>
       Pool title
-      <input [(ngModel)]="pool.title" (ngModelChange)="saved.emit()" [disabled]="!isAdmin" />
+      <input [(ngModel)]="pool.title" (ngModelChange)="saved.emit()" [disabled]="!isAdmin || setupMode === 'seeded'" />
     </label>
     <label>
       Division
-      <select [(ngModel)]="pool.division" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+      <select [(ngModel)]="pool.division" (ngModelChange)="saved.emit(); refreshSeededPreview()" [disabled]="!isAdmin">
         @for (division of divisionOptions; track division) {
           <option [ngValue]="division">{{ division }}</option>
         }
       </select>
     </label>
+    @if (setupMode === 'manual') {
     <div class="inline-fields">
       <div class="pool-format-fields">
         <label>
@@ -108,8 +125,168 @@
       </div>
       <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
     </div>
+    } @else {
+      <div class="seeded-option-row">
+        <label class="checkbox-row">
+          <input type="checkbox" [(ngModel)]="replaceDivisionPools" (ngModelChange)="refreshSeededPreview()" />
+          Replace existing pools in this division
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" [(ngModel)]="prioritizeFiveTeamPools" (ngModelChange)="refreshSeededPreview()" />
+          Prioritize 5 team pools
+        </label>
+      </div>
+      <div class="seeded-format-grid">
+        @for (row of primarySeededFormatRows; track row.size) {
+          <section class="seeded-format-panel">
+            <h3>{{ row.size }} team pools</h3>
+            <label>
+              Games per match
+              <input
+                type="number"
+                min="1"
+                max="5"
+                [(ngModel)]="row.format.gamesPerMatch"
+                (ngModelChange)="refreshSeededPreview()"
+              />
+            </label>
+            <label>
+              Target score
+              <input
+                type="number"
+                min="1"
+                max="99"
+                [(ngModel)]="row.format.targetScore"
+                (ngModelChange)="refreshSeededPreview()"
+              />
+            </label>
+            <label>
+              Cap
+              <input
+                type="number"
+                min="1"
+                max="99"
+                [(ngModel)]="row.format.pointCap"
+                (ngModelChange)="refreshSeededPreview()"
+              />
+            </label>
+            <label>
+              Schedule
+              <span class="schedule-tooltip-field">
+                <select
+                  [(ngModel)]="row.format.schedulePresetId"
+                  (ngModelChange)="refreshSeededPreview()"
+                  [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
+                >
+                  @for (preset of schedulePresetsForSize(row.size); track preset.id) {
+                    <option [value]="preset.id">{{ preset.label }}</option>
+                  }
+                </select>
+                <button
+                  type="button"
+                  class="info-tooltip-button"
+                  aria-label="Preview schedule"
+                  [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
+                >
+                  i
+                </button>
+              </span>
+            </label>
+          </section>
+        }
+      </div>
+      <details class="advanced-seeded-settings">
+        <summary>Advanced pool sizes</summary>
+        <div class="seeded-format-grid">
+          @for (row of advancedSeededFormatRows; track row.size) {
+            <section class="seeded-format-panel">
+              <h3>{{ row.size }} team pools</h3>
+              <label>
+                Games per match
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  [(ngModel)]="row.format.gamesPerMatch"
+                  (ngModelChange)="refreshSeededPreview()"
+                />
+              </label>
+              <label>
+                Target score
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  [(ngModel)]="row.format.targetScore"
+                  (ngModelChange)="refreshSeededPreview()"
+                />
+              </label>
+              <label>
+                Cap
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  [(ngModel)]="row.format.pointCap"
+                  (ngModelChange)="refreshSeededPreview()"
+                />
+              </label>
+              <label>
+                Schedule
+                <span class="schedule-tooltip-field">
+                  <select
+                    [(ngModel)]="row.format.schedulePresetId"
+                    (ngModelChange)="refreshSeededPreview()"
+                    [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
+                  >
+                    @for (preset of schedulePresetsForSize(row.size); track preset.id) {
+                      <option [value]="preset.id">{{ preset.label }}</option>
+                    }
+                  </select>
+                  <button
+                    type="button"
+                    class="info-tooltip-button"
+                    aria-label="Preview schedule"
+                    [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
+                  >
+                    i
+                  </button>
+                </span>
+              </label>
+            </section>
+          }
+        </div>
+      </details>
+      <label>
+        Seeded team file
+        <input
+          type="file"
+          accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          (change)="seededFileSelected($event)"
+        />
+      </label>
+      @if (seededImportFileName) {
+        <p class="match-summary">{{ seededImportFileName }}</p>
+      }
+      @if (seededImportReading) {
+        <p class="scan-progress">Reading seeded team file...</p>
+      }
+      @if (seededImportError) {
+        <p class="scan-error">{{ seededImportError }}</p>
+      }
+    }
     @if (isAdmin) {
-      <button type="button" (click)="poolSetupSaved.emit()">Save pool setup</button>
+      @if (setupMode === 'manual') {
+        <button type="button" (click)="poolSetupSaved.emit()">Save pool setup</button>
+      } @else {
+        <button
+          type="button"
+          (click)="createSeededPools()"
+          [disabled]="seededImportReading || !seededImportPreview || seededImportPreview.errors.length > 0"
+        >
+          Create Pools
+        </button>
+      }
       <button type="button" class="secondary" (click)="setupCanceled.emit()">Cancel</button>
       @if (canDeletePool) {
         <button type="button" class="danger" (click)="poolDeleted.emit()">Delete pool</button>
@@ -117,6 +294,64 @@
     }
   </div>
 
+  @if (setupMode === 'seeded') {
+    <div class="setup-panel seeded-preview-panel">
+      <div class="seeded-preview-title">
+        <h2>Seeded Import Preview</h2>
+        <button
+          type="button"
+          class="info-tooltip-button"
+          aria-label="How seeded import creates pools"
+          title="Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If 5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest with 4-team pools when that count can be represented cleanly."
+        >
+          i
+        </button>
+      </div>
+      @if (seededImportPreview) {
+        @if (seededImportPreview.errors.length) {
+          <section class="scan-summary seeded-errors">
+            <h3>Blocking errors</h3>
+            <ul>
+              @for (issue of seededImportPreview.errors; track $index) {
+                <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
+              }
+            </ul>
+          </section>
+        }
+        @if (seededImportPreview.warnings.length) {
+          <section class="scan-summary seeded-warnings">
+            <h3>Warnings</h3>
+            <ul>
+              @for (issue of seededImportPreview.warnings; track $index) {
+                <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
+              }
+            </ul>
+          </section>
+        }
+        @if (seededImportPreview.pools.length) {
+          <div class="seeded-preview-grid">
+            @for (previewPool of seededImportPreview.pools; track previewPool.id) {
+              <article class="pool-card">
+                <header>
+                  <div>
+                    <h3 class="pool-card-title">{{ previewPool.title }}</h3>
+                    <p>{{ seededPoolSummary(previewPool) }}</p>
+                  </div>
+                </header>
+                <ol class="seeded-team-list">
+                  @for (team of previewPool.teams; track team.seed) {
+                    <li><strong>{{ team.seed }}</strong><span>{{ team.name }}</span></li>
+                  }
+                </ol>
+              </article>
+            }
+          </div>
+        }
+      } @else {
+        <p class="empty-copy">Choose a seeded team CSV or Excel file to preview generated pools.</p>
+      }
+    </div>
+  } @else {
   <div class="setup-panel teams-panel">
     <h2>Teams</h2>
     @for (team of pool.teams; track team.seed) {
@@ -144,7 +379,7 @@
             (ngModelChange)="schedulePresetSelected($event)"
           >
             <option value="">Choose schedule</option>
-            @for (preset of schedulePresets; track preset.id) {
+            @for (preset of manualSchedulePresets; track preset.id) {
               <option [ngValue]="preset.id">{{ preset.label }}</option>
             }
           </select>
@@ -212,4 +447,5 @@
       <p class="empty-copy">Add the match rows from the pool sheet in the same order they appear.</p>
     }
   </div>
+  }
 </section>

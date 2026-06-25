@@ -1,0 +1,271 @@
+:host {
+  display: block;
+}
+
+.import-event {
+  display: grid;
+  margin: 0 auto;
+  max-width: 980px;
+  width: 100%;
+}
+
+.import-panel {
+  gap: 16px;
+}
+
+.import-actions {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.import-summary {
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  overflow: hidden;
+}
+
+.import-loading {
+  align-items: center;
+  background: #f3f6fa;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  color: #34465c;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+}
+
+.import-loading span {
+  animation: import-spin 0.8s linear infinite;
+  border: 3px solid #cbd5e1;
+  border-radius: 50%;
+  border-top-color: #143f6b;
+  flex: 0 0 auto;
+  height: 20px;
+  width: 20px;
+}
+
+.import-loading p {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+}
+
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.import-summary div {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+}
+
+.import-summary div + div {
+  border-left: 1px solid #e3e9f1;
+}
+
+.import-summary strong {
+  color: #143f6b;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.import-summary span {
+  color: #5d6878;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.import-issues {
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.import-issues h3 {
+  font-size: 15px;
+}
+
+.import-issues ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.import-issues li {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.import-disabled-reason {
+  color: #5d6878;
+  font-size: 13px;
+  font-weight: 700;
+  margin: -6px 0 0;
+}
+
+.error-list {
+  background: #fff1f1;
+  border: 1px solid #e1b1b1;
+  color: #8f2525;
+}
+
+.warning-list {
+  background: #fff8e8;
+  border: 1px solid #e1c582;
+  color: #6d4f08;
+}
+
+.import-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.import-pool {
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.import-pool > header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.import-pool > header p {
+  color: #5d6878;
+  font-size: 12px;
+  font-weight: 800;
+  margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.import-pool > header h3 {
+  color: #143f6b;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.import-pool > header span {
+  color: #526071;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.import-pool-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+}
+
+.import-subpanel {
+  border: 1px solid #e3e9f1;
+  border-radius: 4px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.import-subpanel h4 {
+  color: #34465c;
+  font-size: 14px;
+}
+
+.import-subpanel ol {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.import-subpanel li {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.import-subpanel li strong {
+  background: #eef3f8;
+  border-radius: 4px;
+  color: #34465c;
+  font-size: 12px;
+  padding: 5px;
+  text-align: center;
+}
+
+.import-subpanel li span {
+  color: #34465c;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.modal-backdrop {
+  align-items: center;
+  background: rgb(15 45 76 / 28%);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  padding: 16px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 30;
+}
+
+.template-modal {
+  box-shadow: 0 18px 60px rgb(15 45 76 / 24%);
+  max-height: calc(100vh - 32px);
+  max-width: 560px;
+  overflow: auto;
+  width: 100%;
+}
+
+.template-count-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .import-pool-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .import-actions,
+  .import-summary,
+  .template-count-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .import-summary div + div {
+    border-left: 0;
+    border-top: 1px solid #e3e9f1;
+  }
+
+  .import-pool > header {
+    display: grid;
+  }
+
+  .import-pool > header span {
+    text-align: left;
+  }
+}

@@ -31,8 +31,8 @@ export const SCHEDULE_PRESETS: SchedulePreset[] = [
     label: '4 Team Standard',
     teamCount: 4,
     rows: [
-      { teamASeed: 2, teamBSeed: 4, refSeed: 1 },
       { teamASeed: 1, teamBSeed: 3, refSeed: 2 },
+      { teamASeed: 2, teamBSeed: 4, refSeed: 1 },
       { teamASeed: 1, teamBSeed: 4, refSeed: 3 },
       { teamASeed: 2, teamBSeed: 3, refSeed: 1 },
       { teamASeed: 3, teamBSeed: 4, refSeed: 2 },

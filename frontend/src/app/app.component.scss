@@ -295,7 +295,8 @@ select {
 }
 
 button,
-.camera-button {
+.camera-button,
+.button-link {
   background: #143f6b;
   border: 1px solid #143f6b;
   border-radius: 4px;
@@ -308,8 +309,14 @@ button,
 }
 
 button:hover,
-.camera-button:hover {
+.camera-button:hover,
+.button-link:hover {
   background: #0f3155;
+}
+
+.button-link {
+  display: inline-block;
+  text-decoration: none;
 }
 
 button:disabled {
@@ -437,6 +444,160 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.mode-toggle {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mode-toggle button {
+  background: #ffffff;
+  border-color: #b8c5d6;
+  color: #34465c;
+}
+
+.mode-toggle button.active {
+  background: #143f6b;
+  border-color: #143f6b;
+  color: #ffffff;
+}
+
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.checkbox-row input {
+  min-height: auto;
+}
+
+.seeded-option-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+
+.seeded-format-grid,
+.seeded-preview-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seeded-format-panel {
+  border: 1px solid #e3e9f1;
+  border-radius: 4px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.seeded-format-panel h3 {
+  color: #34465c;
+  font-size: 14px;
+}
+
+.advanced-seeded-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.advanced-seeded-settings summary {
+  color: #34465c;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.advanced-seeded-settings[open] summary {
+  margin-bottom: 10px;
+}
+
+.schedule-tooltip-field {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.seeded-preview-panel {
+  grid-column: 1 / -1;
+}
+
+.seeded-preview-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.info-tooltip-button {
+  align-items: center;
+  background: #eef3f8;
+  border-color: #b8c5d6;
+  border-radius: 50%;
+  color: #34465c;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 24px;
+}
+
+.info-tooltip-button:hover,
+.info-tooltip-button:focus-visible {
+  background: #dfe8f2;
+  color: #143f6b;
+}
+
+.seeded-setup-panel {
+  grid-column: 1 / -1;
+}
+
+.seeded-errors {
+  background: #fff1f1;
+  border-color: #e1b1b1;
+  color: #8f2525;
+}
+
+.seeded-warnings {
+  background: #fff8e8;
+  border-color: #e1c582;
+  color: #6d4f08;
+}
+
+.seeded-team-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.seeded-team-list li {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.seeded-team-list strong {
+  background: #eef3f8;
+  border-radius: 4px;
+  color: #34465c;
+  font-size: 12px;
+  padding: 5px;
+  text-align: center;
+}
+
+.seeded-team-list span {
+  overflow-wrap: anywhere;
+}
+
 .schedule-row {
   align-items: end;
   border: 1px solid #e3e9f1;
@@ -524,7 +685,9 @@ app-match-row {
   .setup-grid,
   .teams-panel,
   .match-grid,
-  .pool-grid {
+  .pool-grid,
+  .seeded-format-grid,
+  .seeded-preview-grid {
     grid-template-columns: 1fr;
   }
 
