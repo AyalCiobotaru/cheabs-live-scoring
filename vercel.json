@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --omit=dev --ignore-scripts && npm --prefix frontend ci",
   "buildCommand": "pnpm run vercel-build",
   "outputDirectory": "frontend/dist/frontend/browser",
   "functions": {
