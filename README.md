@@ -11,6 +11,7 @@ Standalone mobile-first volleyball pool scoring app for creating events, running
 - Live in-progress match scoring with Ably pub/sub
 - Pool standings from completed matches
 - Match start timer support between matches
+- Browser-local pool favorites with a favorites-only dashboard view across divisions
 - Admin event import from CSV with preview, validation, and template downloads
 - Semi-structured event import template generation for common pool sizes
 - Seeded team import for an existing event from CSV or XLSX
@@ -57,6 +58,10 @@ Seeded import supports:
 - Per-pool-size scoring settings
 - Per-pool-size schedule preset selection with schedule preview tooltips
 - Optional prioritization of 5-team pools before filling remaining teams into 4-team pools
+
+## Pool Favorites
+
+Users can favorite pools from the event dashboard. Favorites are stored in the browser's local storage per event, so they do not require sign-in and do not affect other users. The Favorites view shows favorited pools across all divisions in that event.
 
 ## Future Plans
 
