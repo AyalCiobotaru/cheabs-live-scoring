@@ -261,7 +261,7 @@
         Seeded team file
         <input
           type="file"
-          accept=".csv,.xlsx,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           (change)="seededFileSelected($event)"
         />
       </label>
@@ -348,7 +348,7 @@
           </div>
         }
       } @else {
-        <p class="empty-copy">Choose a seeded team CSV or Excel file to preview generated pools.</p>
+        <p class="empty-copy">Choose a seeded team CSV or XLSX file to preview generated pools.</p>
       }
     </div>
   } @else {

@@ -15,10 +15,13 @@ export class SideMenuComponent {
   @Input() hasEvent = false;
   @Input() isAdmin = false;
   @Input() poolCount = 0;
+  @Input() favoritePoolCount = 0;
   @Input() selectedDivision: string | null = null;
+  @Input() showingFavoritePools = false;
   @Input() divisionOptions: DivisionFilterOption[] = [];
 
   @Output() poolsSelected = new EventEmitter<void>();
+  @Output() favoritesSelected = new EventEmitter<void>();
   @Output() chooseEventSelected = new EventEmitter<void>();
   @Output() adminSelected = new EventEmitter<void>();
   @Output() adminSignOutSelected = new EventEmitter<void>();
@@ -41,6 +44,11 @@ export class SideMenuComponent {
 
   selectPools(): void {
     this.poolsSelected.emit();
+    this.closeMenu();
+  }
+
+  selectFavorites(): void {
+    this.favoritesSelected.emit();
     this.closeMenu();
   }
 

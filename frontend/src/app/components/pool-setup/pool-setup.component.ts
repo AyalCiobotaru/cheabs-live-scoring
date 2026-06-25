@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, EventEmitter, inject, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import * as XLSX from 'xlsx';
+import { readSheet } from 'read-excel-file/browser';
 import { PoolState, ScanSummary, SeededImportFormats, SeededImportPreview } from '../../models';
 import { SchedulePreset } from '../../util/schedule-presets';
 import {
@@ -216,60 +216,46 @@ export class PoolSetupComponent implements OnChanges {
 
 const readSeededTeamFile = async (file: File): Promise<string> => {
   if (isExcelFile(file)) {
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
+    return worksheetToSeededCsv(await readSheet(file));
+  }
 
-    if (!firstSheetName) {
-      throw new Error('That Excel file does not contain any worksheets.');
-    }
-
-    return worksheetToSeededCsv(workbook.Sheets[firstSheetName]);
+  if (isLegacyExcelFile(file)) {
+    throw new Error('Legacy .xls files are not supported. Save the spreadsheet as .xlsx or CSV and try again.');
   }
 
   return file.text();
 };
 
-const worksheetToSeededCsv = (worksheet: XLSX.WorkSheet): string => {
-  const rows = new Map<number, Map<number, string>>();
-
-  for (const cellAddress of Object.keys(worksheet)) {
-    if (cellAddress.startsWith('!')) {
-      continue;
-    }
-
-    const cell = XLSX.utils.decode_cell(cellAddress);
-
-    if (cell.c > 1) {
-      continue;
-    }
-
-    const value = XLSX.utils.format_cell(worksheet[cellAddress]).trim();
-
-    if (!value) {
-      continue;
-    }
-
-    const row = rows.get(cell.r) ?? new Map<number, string>();
-    row.set(cell.c, value);
-    rows.set(cell.r, row);
-  }
-
-  return [...rows.entries()]
-    .sort(([leftRow], [rightRow]) => leftRow - rightRow)
-    .map(([, row]) => [csvCell(row.get(0) ?? ''), csvCell(row.get(1) ?? '')].join(','))
+const worksheetToSeededCsv = (rows: unknown[][]): string =>
+  rows
+    .map((row) => [excelCellText(row[0]), excelCellText(row[1])])
+    .filter(([seed, teamName]) => seed || teamName)
+    .map(([seed, teamName]) => [csvCell(seed), csvCell(teamName)].join(','))
     .join('\n');
-};
 
 const csvCell = (value: string): string =>
   /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+
+const excelCellText = (value: unknown): string => {
+  if (value == null) {
+    return '';
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return String(value).trim();
+};
 
 const isExcelFile = (file: File): boolean => {
   const fileName = file.name.toLowerCase();
 
   return (
     fileName.endsWith('.xlsx') ||
-    fileName.endsWith('.xls') ||
-    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    file.type === 'application/vnd.ms-excel'
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );
 };
+
+const isLegacyExcelFile = (file: File): boolean =>
+  file.name.toLowerCase().endsWith('.xls') || file.type === 'application/vnd.ms-excel';

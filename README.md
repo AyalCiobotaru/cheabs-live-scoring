@@ -13,7 +13,7 @@ Standalone mobile-first volleyball pool scoring app for creating events, running
 - Match start timer support between matches
 - Admin event import from CSV with preview, validation, and template downloads
 - Semi-structured event import template generation for common pool sizes
-- Seeded team import for an existing event from CSV, XLS, or XLSX
+- Seeded team import for an existing event from CSV or XLSX
 - Seeded import pool generation with snake seeding, schedule selection, 4/5-team pool preferences, and special handling for 6, 7, and 11 teams
 - Division-scoped bulk pool creation with append or replace behavior
 - 31-day event, pool setup, and final score persistence with Upstash Redis
@@ -22,16 +22,14 @@ Standalone mobile-first volleyball pool scoring app for creating events, running
 ## Local Development
 
 ```powershell
-npm install
-npm run start:api
+pnpm install
+pnpm start:api
 ```
 
 In another terminal:
 
 ```powershell
-cd frontend
-npm install
-npm start
+pnpm --dir frontend start
 ```
 
 Set these values in `.env` for the API:
@@ -48,7 +46,7 @@ Admins can create a new event from a CSV file. The import flow previews the even
 
 ### Seeded Pool Import
 
-For an event that already exists, admins can import a seeded team list by division from CSV, XLS, or XLSX. The importer previews generated pools before saving them and can either append to the selected division or replace existing pools in that division.
+For an event that already exists, admins can import a seeded team list by division from CSV or XLSX. The importer previews generated pools before saving them and can either append to the selected division or replace existing pools in that division.
 
 Seeded import supports:
 

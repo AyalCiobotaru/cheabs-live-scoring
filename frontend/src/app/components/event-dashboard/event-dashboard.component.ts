@@ -13,9 +13,19 @@ export class EventDashboardComponent {
   @Input({ required: true }) isAdmin = false;
   @Input({ required: true }) poolCards: PoolCard[] = [];
   @Input({ required: true }) visibleDivisionPoolGroups: DivisionPoolGroup[] = [];
+  @Input({ required: true }) favoritePoolIds: string[] = [];
+  @Input({ required: true }) showingFavoritePools = false;
+  @Input({ required: true }) favoritePoolCount = 0;
 
   @Output() addPool = new EventEmitter<void>();
+  @Output() allPoolsSelected = new EventEmitter<void>();
+  @Output() favoritesSelected = new EventEmitter<void>();
+  @Output() poolFavoriteToggled = new EventEmitter<string>();
   @Output() poolSelected = new EventEmitter<string>();
   @Output() timerSelected = new EventEmitter<string>();
   @Output() poolDeleted = new EventEmitter<string>();
+
+  isFavorite(poolId: string): boolean {
+    return this.favoritePoolIds.includes(poolId);
+  }
 }

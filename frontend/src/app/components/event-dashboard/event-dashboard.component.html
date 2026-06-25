@@ -9,8 +9,18 @@
     }
   </div>
 
+  <div class="dashboard-view-toggle">
+    <button type="button" class="secondary" [class.active]="!showingFavoritePools" (click)="allPoolsSelected.emit()">
+      All pools
+    </button>
+    <button type="button" class="secondary" [class.active]="showingFavoritePools" (click)="favoritesSelected.emit()">
+      Favorites ({{ favoritePoolCount }})
+    </button>
+  </div>
+
   @if (poolCards.length) {
-    <section class="division-groups">
+    @if (visibleDivisionPoolGroups.length) {
+      <section class="division-groups">
       @for (group of visibleDivisionPoolGroups; track group.division) {
         <section class="division-group">
           <div class="division-heading">
@@ -29,6 +39,16 @@
               >
                 <div class="pool-card-heading">
                   <h4 class="pool-card-title">{{ card.pool.title }}</h4>
+                  <button
+                    type="button"
+                    class="secondary icon-button favorite-toggle"
+                    [class.active]="isFavorite(card.pool.id)"
+                    [attr.aria-label]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
+                    [title]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
+                    (click)="$event.stopPropagation(); poolFavoriteToggled.emit(card.pool.id)"
+                  >
+                    {{ isFavorite(card.pool.id) ? '★' : '☆' }}
+                  </button>
                   @if (isAdmin) {
                     <button
                       type="button"
@@ -54,7 +74,14 @@
           </div>
         </section>
       }
-    </section>
+      </section>
+    } @else {
+      <div class="setup-panel">
+        <p class="empty-copy">
+          {{ showingFavoritePools ? 'No favorite pools yet.' : 'No pools match the selected view.' }}
+        </p>
+      </div>
+    }
   } @else {
     <div class="setup-panel">
       <p class="empty-copy">No pools have been added yet.</p>

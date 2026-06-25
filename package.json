@@ -3,21 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "build": "npm --prefix frontend run build",
-    "lint": "npm --prefix frontend run lint",
-    "lint:fix": "npm --prefix frontend run lint:fix",
-    "format": "npm --prefix frontend run format",
-    "format:check": "npm --prefix frontend run format:check",
+    "build": "pnpm --dir frontend run build",
+    "lint": "pnpm --dir frontend run lint",
+    "lint:fix": "pnpm --dir frontend run lint:fix",
+    "format": "pnpm --dir frontend run format",
+    "format:check": "pnpm --dir frontend run format:check",
     "start:api": "node --env-file=.env server/local-server.mjs",
     "start:api:debug": "node --inspect-brk=9229 --env-file=.env ./server/local-server.mjs",
-    "vercel-build": "npm --prefix frontend run build"
+    "vercel-build": "pnpm --dir frontend run build"
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
   },
   "dependencies": {
-    "@google-cloud/vision": "^5.3.6",
+    "@google-cloud/vision": "^5.3.7",
     "ably": "^2.21.0"
   }
 }
