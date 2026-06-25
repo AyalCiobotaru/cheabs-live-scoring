@@ -36,6 +36,7 @@ import { ScoringRealtimeService } from './scoring-realtime.service';
 
 const CURRENT_EVENT_KEY = 'cheabs.liveScoring.currentEvent.v1';
 const ADMIN_PASSWORD_KEY = 'cheabs.liveScoring.adminPassword.v1';
+const POOL_FAVORITES_KEY_PREFIX = 'cheabs.liveScoring.poolFavorites.v1.';
 
 interface SideSwitchToast {
   message: string;
@@ -80,6 +81,8 @@ export class ScoringEventStateService {
   scanStatus: 'idle' | 'scanning' | 'success' | 'failed' = 'idle';
   sideSwitchToast: SideSwitchToast | null = null;
   selectedDivision: string | null = null;
+  showingFavoritePools = false;
+  favoritePoolIds = new Set<string>();
 
   constructor(
     private readonly zone: NgZone,
@@ -146,7 +149,7 @@ export class ScoringEventStateService {
     return this.event?.pools.map((pool) => buildPoolCard(pool)) ?? [];
   }
 
-  get divisionPoolGroups(): DivisionPoolGroup[] {
+  get allDivisionPoolGroups(): DivisionPoolGroup[] {
     const groups = new Map<string, PoolCard[]>();
 
     for (const card of this.poolCards) {
@@ -159,12 +162,39 @@ export class ScoringEventStateService {
       .map(([division, cards]) => ({ division, cards }));
   }
 
+  get divisionPoolGroups(): DivisionPoolGroup[] {
+    const groups = new Map<string, PoolCard[]>();
+
+    for (const card of this.visiblePoolCards) {
+      const division = normalizeDivision(card.pool.division);
+      groups.set(division, [...(groups.get(division) ?? []), card]);
+    }
+
+    return [...groups.entries()]
+      .sort(([left], [right]) => divisionSortIndex(left) - divisionSortIndex(right) || left.localeCompare(right))
+      .map(([division, cards]) => ({ division, cards }));
+  }
+
   get visibleDivisionPoolGroups(): DivisionPoolGroup[] {
-    if (!this.selectedDivision) {
+    if (this.showingFavoritePools || !this.selectedDivision) {
       return this.divisionPoolGroups;
     }
 
     return this.divisionPoolGroups.filter((group) => group.division === this.selectedDivision);
+  }
+
+  get visiblePoolCards(): PoolCard[] {
+    return this.showingFavoritePools
+      ? this.poolCards.filter((card) => this.favoritePoolIds.has(card.pool.id))
+      : this.poolCards;
+  }
+
+  get favoritePoolCount(): number {
+    return this.poolCards.filter((card) => this.favoritePoolIds.has(card.pool.id)).length;
+  }
+
+  get favoritePoolIdList(): string[] {
+    return [...this.favoritePoolIds];
   }
 
   poolCountForDivision(division: string): number {
@@ -172,7 +202,7 @@ export class ScoringEventStateService {
   }
 
   get divisionFilterOptions(): { division: string; count: number }[] {
-    return this.divisionPoolGroups.map((group) => ({
+    return this.allDivisionPoolGroups.map((group) => ({
       division: group.division,
       count: group.cards.length
     }));
@@ -220,6 +250,7 @@ export class ScoringEventStateService {
       this.eventName = this.event.name;
       this.activePoolId = this.event.activePoolId;
       this.draftPool = null;
+      this.loadPoolFavorites();
       this.persistLocal();
       await this.realtime.connect(this.event.code);
     } catch {
@@ -263,6 +294,7 @@ export class ScoringEventStateService {
       this.eventName = this.event.name;
       this.activePoolId = this.event.activePoolId;
       this.draftPool = null;
+      this.loadPoolFavorites();
       this.persistLocal();
       await this.router.navigate(['/events', this.event.code]);
       this.bump();
@@ -327,6 +359,8 @@ export class ScoringEventStateService {
     this.activePoolId = null;
     this.expandedMatchId = null;
     this.selectedDivision = null;
+    this.showingFavoritePools = false;
+    this.favoritePoolIds = new Set<string>();
     this.dismissSideSwitchToast();
     localStorage.removeItem(CURRENT_EVENT_KEY);
     void this.router.navigate(['/']);
@@ -340,6 +374,7 @@ export class ScoringEventStateService {
 
     this.draftPool = null;
     this.expandedMatchId = null;
+    this.showingFavoritePools = false;
     void this.router.navigate(['/events', this.event.code], {
       queryParams: this.selectedDivision ? { division: this.selectedDivision } : undefined
     });
@@ -362,6 +397,7 @@ export class ScoringEventStateService {
 
   selectDivision(division: string | null): void {
     this.selectedDivision = division;
+    this.showingFavoritePools = false;
     this.draftPool = null;
     this.expandedMatchId = null;
 
@@ -377,6 +413,49 @@ export class ScoringEventStateService {
   setSelectedDivisionFromRoute(division: string | null): void {
     const normalized = division ? normalizeDivision(division) : null;
     this.selectedDivision = normalized && normalized === division ? normalized : null;
+    this.bump();
+  }
+
+  openFavoritePools(): void {
+    if (!this.event) {
+      return;
+    }
+
+    this.showingFavoritePools = true;
+    this.selectedDivision = null;
+    this.draftPool = null;
+    this.expandedMatchId = null;
+    void this.router.navigate(['/events', this.event.code], {
+      queryParams: { favorites: '1' }
+    });
+    this.bump();
+  }
+
+  setFavoritePoolsFromRoute(showingFavorites: boolean): void {
+    this.showingFavoritePools = showingFavorites;
+
+    if (showingFavorites) {
+      this.selectedDivision = null;
+    }
+
+    this.bump();
+  }
+
+  togglePoolFavorite(poolId: string): void {
+    if (!this.event?.pools.some((pool) => pool.id === poolId)) {
+      return;
+    }
+
+    const next = new Set(this.favoritePoolIds);
+
+    if (next.has(poolId)) {
+      next.delete(poolId);
+    } else {
+      next.add(poolId);
+    }
+
+    this.favoritePoolIds = next;
+    this.persistPoolFavorites();
     this.bump();
   }
 
@@ -561,6 +640,7 @@ export class ScoringEventStateService {
 
     this.event = this.normalizeEvent(body.event);
     this.activePoolId = this.event.activePoolId;
+    this.persistPoolFavorites();
     this.draftPool = null;
     this.expandedMatchId = null;
     this.persistLocal();
@@ -635,6 +715,7 @@ export class ScoringEventStateService {
     const body = (await response.json()) as { event: EventState };
     this.event = this.normalizeEvent(body.event);
     this.activePoolId = this.event.activePoolId;
+    this.removePoolFavorite(pool.id);
     this.draftPool = null;
     this.expandedMatchId = null;
     this.resetScanState();
@@ -937,6 +1018,7 @@ export class ScoringEventStateService {
       this.eventCode = this.event.code;
       this.eventName = this.event.name;
       this.activePoolId = this.event.activePoolId;
+      this.loadPoolFavorites();
       this.persistLocal();
       await this.realtime.connect(this.event.code);
       await this.router.navigate(['/events', this.event.code]);
@@ -1042,6 +1124,7 @@ export class ScoringEventStateService {
       void this.router.navigate(['/events', this.event.code]);
     }
 
+    this.removePoolFavorite(poolId);
     this.persistLocal();
     this.bump();
   }
@@ -1206,6 +1289,41 @@ export class ScoringEventStateService {
 
     localStorage.setItem(CURRENT_EVENT_KEY, this.event.code);
     localStorage.setItem(this.localEventKey(this.event.code), JSON.stringify(this.eventWithoutImages(this.event)));
+  }
+
+  private loadPoolFavorites(): void {
+    if (!this.event) {
+      this.favoritePoolIds = new Set<string>();
+      return;
+    }
+
+    const raw = localStorage.getItem(this.poolFavoritesKey(this.event.code));
+    const ids = parseStoredStringArray(raw);
+    const eventPoolIds = new Set(this.event.pools.map((pool) => pool.id));
+    this.favoritePoolIds = new Set(ids.filter((id) => eventPoolIds.has(id)));
+    this.persistPoolFavorites();
+  }
+
+  private persistPoolFavorites(): void {
+    if (!this.event) {
+      return;
+    }
+
+    const eventPoolIds = new Set(this.event.pools.map((pool) => pool.id));
+    const ids = [...this.favoritePoolIds].filter((id) => eventPoolIds.has(id));
+    this.favoritePoolIds = new Set(ids);
+    localStorage.setItem(this.poolFavoritesKey(this.event.code), JSON.stringify(ids));
+  }
+
+  private removePoolFavorite(poolId: string): void {
+    if (!this.favoritePoolIds.has(poolId)) {
+      return;
+    }
+
+    const next = new Set(this.favoritePoolIds);
+    next.delete(poolId);
+    this.favoritePoolIds = next;
+    this.persistPoolFavorites();
   }
 
   private touchPool(pool: PoolState): void {
@@ -1458,7 +1576,24 @@ export class ScoringEventStateService {
     return `cheabs.liveScoring.event.${code}.v1`;
   }
 
+  private poolFavoritesKey(code: string): string {
+    return `${POOL_FAVORITES_KEY_PREFIX}${code}`;
+  }
+
   private bump(): void {
     this.version.update((value) => value + 1);
   }
 }
+
+const parseStoredStringArray = (raw: string | null): string[] => {
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
+};

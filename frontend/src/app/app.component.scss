@@ -162,6 +162,18 @@ h4 {
   gap: 16px;
 }
 
+.dashboard-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-view-toggle button.active {
+  background: #143f6b;
+  border-color: #143f6b;
+  color: #ffffff;
+}
+
 .division-groups {
   display: grid;
   gap: 18px;
@@ -232,12 +244,30 @@ h4 {
   font-size: 18px;
   font-weight: 800;
   line-height: 1.2;
+  margin-right: auto;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .pool-card-delete {
   flex: 0 0 auto;
+}
+
+.favorite-toggle {
+  align-items: center;
+  color: #526071;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 20px;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+
+.favorite-toggle.active {
+  background: #fff8e8;
+  border-color: #e1c582;
+  color: #9a6a00;
 }
 
 .event-title p,

@@ -19,7 +19,13 @@
   </div>
   <nav class="side-menu-actions">
     @if (hasEvent) {
-      <button type="button" class="menu-action" (click)="selectPools()">Pools</button>
+      <button type="button" class="menu-action" [class.active]="!showingFavoritePools" (click)="selectPools()">
+        Pools
+      </button>
+      <button type="button" class="menu-action" [class.active]="showingFavoritePools" (click)="selectFavorites()">
+        <span>Favorites</span>
+        <small>{{ favoritePoolCount }}</small>
+      </button>
       <button type="button" class="menu-action" (click)="selectChooseEvent()">Choose event</button>
     }
     @if (isAdmin) {
@@ -41,7 +47,12 @@
     </button>
     @if (divisionsExpanded) {
       <div class="division-dropdown">
-        <button type="button" class="division-item" [class.active]="!selectedDivision" (click)="selectDivision(null)">
+        <button
+          type="button"
+          class="division-item"
+          [class.active]="!selectedDivision && !showingFavoritePools"
+          (click)="selectDivision(null)"
+        >
           <span>All divisions</span>
           <small>{{ poolCount }}</small>
         </button>

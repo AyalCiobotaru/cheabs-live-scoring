@@ -83,10 +83,17 @@
 }
 
 .menu-action:hover,
+.menu-action.active,
 .division-item:hover,
 .division-item.active {
   background: #eef3f8;
   border-color: #9db1c8;
+}
+
+.menu-action small {
+  color: #5d6878;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .secondary {
