@@ -1,7 +1,12 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, inject, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { PoolState, ScanSummary } from '../../models';
+import * as XLSX from 'xlsx';
+import { PoolState, ScanSummary, SeededImportFormats, SeededImportPreview } from '../../models';
 import { SchedulePreset } from '../../util/schedule-presets';
+import {
+  DEFAULT_SEEDED_IMPORT_FORMATS,
+  buildSeededImportPreview
+} from '../../util/seeded-pool-import-rules';
 
 @Component({
   selector: 'app-pool-setup',
@@ -9,12 +14,16 @@ import { SchedulePreset } from '../../util/schedule-presets';
   imports: [FormsModule],
   templateUrl: './pool-setup.component.html'
 })
-export class PoolSetupComponent {
+export class PoolSetupComponent implements OnChanges {
+  private readonly changeDetector = inject(ChangeDetectorRef);
+
   @Input({ required: true }) pool!: PoolState;
   @Input({ required: true }) isAdmin = false;
   @Input({ required: true }) teamCountOptions: number[] = [];
   @Input({ required: true }) divisionOptions: string[] = [];
   @Input({ required: true }) schedulePresets: SchedulePreset[] = [];
+  @Input({ required: true }) existingDivisionPoolCount = 0;
+  @Input({ required: true }) seededImportEnabled = true;
   @Input({ required: true }) scanStatus: 'idle' | 'scanning' | 'success' | 'failed' = 'idle';
   @Input() scanProgress = '';
   @Input() scanSummary: ScanSummary | null = null;
@@ -29,12 +38,73 @@ export class PoolSetupComponent {
   @Output() poolSetupSaved = new EventEmitter<void>();
   @Output() poolDeleted = new EventEmitter<void>();
   @Output() setupCanceled = new EventEmitter<void>();
+  @Output() seededPoolsCreated = new EventEmitter<{
+    pools: PoolState[];
+    division: string;
+    replaceDivisionPools: boolean;
+  }>();
   @Output() matchAdded = new EventEmitter<void>();
   @Output() matchMoved = new EventEmitter<{ matchId: string; direction: -1 | 1 }>();
   @Output() matchRemoved = new EventEmitter<string>();
   @Output() schedulePresetApplied = new EventEmitter<string>();
 
   selectedSchedulePresetId = '';
+  setupMode: 'manual' | 'seeded' = 'manual';
+  replaceDivisionPools = false;
+  prioritizeFiveTeamPools = false;
+  seededImportText = '';
+  seededImportFileName = '';
+  seededImportError = '';
+  seededImportReading = false;
+  seededImportPreview: SeededImportPreview | null = null;
+  seededFormats: SeededImportFormats = structuredClone(DEFAULT_SEEDED_IMPORT_FORMATS);
+
+  get seededFormatRows(): { size: 4 | 5 | 6 | 7; format: SeededImportFormats[4] }[] {
+    return [
+      { size: 4, format: this.seededFormats[4] },
+      { size: 5, format: this.seededFormats[5] },
+      { size: 6, format: this.seededFormats[6] },
+      { size: 7, format: this.seededFormats[7] }
+    ];
+  }
+
+  get primarySeededFormatRows(): { size: 4 | 5; format: SeededImportFormats[4] }[] {
+    return [
+      { size: 4, format: this.seededFormats[4] },
+      { size: 5, format: this.seededFormats[5] }
+    ];
+  }
+
+  get advancedSeededFormatRows(): { size: 6 | 7; format: SeededImportFormats[6] }[] {
+    return [
+      { size: 6, format: this.seededFormats[6] },
+      { size: 7, format: this.seededFormats[7] }
+    ];
+  }
+
+  get manualSchedulePresets(): SchedulePreset[] {
+    return this.schedulePresetsForSize(this.pool.teamCount);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.seededImportEnabled && this.setupMode === 'seeded') {
+      this.setupMode = 'manual';
+    }
+
+    if (changes['pool'] || changes['existingDivisionPoolCount']) {
+      this.refreshSeededPreview();
+    }
+  }
+
+  setSetupMode(mode: 'manual' | 'seeded'): void {
+    if (mode === 'seeded' && !this.seededImportEnabled) {
+      return;
+    }
+
+    this.setupMode = mode;
+    this.defaultSeededSchedulePresets();
+    this.refreshSeededPreview();
+  }
 
   teamCountSelected(event: Event): void {
     const select = event.target as HTMLSelectElement;
@@ -51,6 +121,155 @@ export class PoolSetupComponent {
   }
 
   selectedSchedulePresetIsAvailable(): boolean {
-    return this.schedulePresets.some((preset) => preset.id === this.selectedSchedulePresetId);
+    return this.manualSchedulePresets.some((preset) => preset.id === this.selectedSchedulePresetId);
+  }
+
+  async seededFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    this.seededImportError = '';
+    this.seededImportText = '';
+    this.seededImportFileName = file?.name ?? '';
+    this.seededImportReading = false;
+    this.seededImportPreview = null;
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      this.seededImportReading = true;
+      this.changeDetector.detectChanges();
+      this.seededImportText = await readSeededTeamFile(file);
+      this.refreshSeededPreview();
+    } catch (error) {
+      this.seededImportError = error instanceof Error ? error.message : 'Unable to read that seeded team file.';
+    } finally {
+      this.seededImportReading = false;
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  refreshSeededPreview(): void {
+    this.defaultSeededSchedulePresets();
+
+    if (!this.seededImportText.trim() || !this.pool) {
+      this.seededImportPreview = null;
+      return;
+    }
+
+    this.seededImportPreview = buildSeededImportPreview(
+      this.seededImportText,
+      this.pool.division,
+      this.seededFormats,
+      this.replaceDivisionPools ? 1 : this.existingDivisionPoolCount + 1,
+      this.pool.matchStartTimerMinutes,
+      this.prioritizeFiveTeamPools
+    );
+  }
+
+  createSeededPools(): void {
+    const preview = this.seededImportPreview;
+
+    if (!preview || preview.errors.length > 0) {
+      return;
+    }
+
+    this.seededPoolsCreated.emit({
+      pools: preview.pools,
+      division: this.pool.division,
+      replaceDivisionPools: this.replaceDivisionPools
+    });
+  }
+
+  seededPoolSummary(pool: PoolState): string {
+    return `${pool.teamCount} teams, ${pool.gamesPerMatch} game${pool.gamesPerMatch === 1 ? '' : 's'} to ${
+      pool.targetScore
+    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}`;
+  }
+
+  schedulePresetsForSize(size: number): SchedulePreset[] {
+    return this.schedulePresets.filter((preset) => preset.teamCount === size);
+  }
+
+  private defaultSeededSchedulePresets(): void {
+    for (const row of this.seededFormatRows) {
+      if (!row.format.schedulePresetId) {
+        row.format.schedulePresetId = this.schedulePresetsForSize(row.size)[0]?.id ?? '';
+      }
+    }
+  }
+
+  scheduleTooltip(size: number, presetId: string): string {
+    const preset =
+      this.schedulePresets.find((candidate) => candidate.id === presetId) ??
+      this.schedulePresetsForSize(size)[0];
+
+    if (!preset) {
+      return 'No schedule preset is available for that pool size.';
+    }
+
+    return preset.rows.map((row) => `${row.teamASeed} vs ${row.teamBSeed}, work ${row.refSeed}`).join('\n');
   }
 }
+
+const readSeededTeamFile = async (file: File): Promise<string> => {
+  if (isExcelFile(file)) {
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+
+    if (!firstSheetName) {
+      throw new Error('That Excel file does not contain any worksheets.');
+    }
+
+    return worksheetToSeededCsv(workbook.Sheets[firstSheetName]);
+  }
+
+  return file.text();
+};
+
+const worksheetToSeededCsv = (worksheet: XLSX.WorkSheet): string => {
+  const rows = new Map<number, Map<number, string>>();
+
+  for (const cellAddress of Object.keys(worksheet)) {
+    if (cellAddress.startsWith('!')) {
+      continue;
+    }
+
+    const cell = XLSX.utils.decode_cell(cellAddress);
+
+    if (cell.c > 1) {
+      continue;
+    }
+
+    const value = XLSX.utils.format_cell(worksheet[cellAddress]).trim();
+
+    if (!value) {
+      continue;
+    }
+
+    const row = rows.get(cell.r) ?? new Map<number, string>();
+    row.set(cell.c, value);
+    rows.set(cell.r, row);
+  }
+
+  return [...rows.entries()]
+    .sort(([leftRow], [rightRow]) => leftRow - rightRow)
+    .map(([, row]) => [csvCell(row.get(0) ?? ''), csvCell(row.get(1) ?? '')].join(','))
+    .join('\n');
+};
+
+const csvCell = (value: string): string =>
+  /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+
+const isExcelFile = (file: File): boolean => {
+  const fileName = file.name.toLowerCase();
+
+  return (
+    fileName.endsWith('.xlsx') ||
+    fileName.endsWith('.xls') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.type === 'application/vnd.ms-excel'
+  );
+};

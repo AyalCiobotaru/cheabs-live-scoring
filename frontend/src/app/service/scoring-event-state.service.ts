@@ -12,6 +12,7 @@ import {
   PoolTimerUpdate,
   PoolState,
   ScanSummary,
+  SeededPoolsResponse,
   SheetScanResult,
   TeamStanding
 } from '../models';
@@ -164,6 +165,10 @@ export class ScoringEventStateService {
     }
 
     return this.divisionPoolGroups.filter((group) => group.division === this.selectedDivision);
+  }
+
+  poolCountForDivision(division: string): number {
+    return this.event?.pools.filter((pool) => pool.division === division).length ?? 0;
   }
 
   get divisionFilterOptions(): { division: string; count: number }[] {
@@ -512,6 +517,54 @@ export class ScoringEventStateService {
     await this.persistPoolSetup(pool);
     this.draftPool = null;
     void this.router.navigate(['/events', this.event.code, 'pools', pool.id]);
+    this.bump();
+  }
+
+  async createSeededPools(payload: {
+    pools: PoolState[];
+    division: string;
+    replaceDivisionPools: boolean;
+  }): Promise<void> {
+    if (!this.event || !this.isAdmin) {
+      return;
+    }
+
+    const selectedDivisionPools = this.event.pools.filter((pool) => pool.division === payload.division);
+    const overwritesScoredPools =
+      payload.replaceDivisionPools && selectedDivisionPools.some((pool) => this.hasStartedScoring(pool));
+    const confirmOverwriteScored =
+      !overwritesScoredPools ||
+      confirm('This will replace pools in this division that already have scores. Continue?');
+
+    if (!confirmOverwriteScored) {
+      return;
+    }
+
+    const response = await fetch(`/api/scoring/events/${this.event.code}/pools/bulk`, {
+      method: 'PUT',
+      headers: this.adminHeaders(),
+      body: JSON.stringify({
+        division: payload.division,
+        replaceDivisionPools: payload.replaceDivisionPools,
+        confirmOverwriteScored,
+        pools: payload.pools.map((pool) => this.poolWithoutImage(pool))
+      })
+    });
+    const body = (await response.json().catch(() => ({}))) as SeededPoolsResponse;
+
+    if (!response.ok || !body.event) {
+      this.eventError =
+        body.errors?.map((error) => error.message).join(' ') || body.message || body.error || 'Unable to create pools.';
+      this.bump();
+      return;
+    }
+
+    this.event = this.normalizeEvent(body.event);
+    this.activePoolId = this.event.activePoolId;
+    this.draftPool = null;
+    this.expandedMatchId = null;
+    this.persistLocal();
+    await this.router.navigate(['/events', this.event.code]);
     this.bump();
   }
 

@@ -130,6 +130,7 @@ export async function handleApiRequest(request, response) {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     const route = `${request.method} ${url.pathname}`;
     const eventMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)$/);
+    const bulkPoolsMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/bulk$/);
     const poolMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)$/);
     const matchMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)$/);
     const finalMatch = url.pathname.match(
@@ -223,6 +224,62 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
       }
 
+      return json(response, { event });
+    }
+
+    if (bulkPoolsMatch && request.method === 'PUT') {
+      requireAdmin(request);
+      const code = normalizeEventCode(bulkPoolsMatch[1]);
+      const payload = await readJson(request);
+      const event = await readEvent(code);
+
+      if (!event) {
+        throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      }
+
+      const division = normalizeDivision(payload.division);
+      const incomingPools = Array.isArray(payload.pools)
+        ? payload.pools.map((pool) => sanitizePool({ ...pool, division })).filter(Boolean)
+        : [];
+
+      if (incomingPools.length === 0) {
+        throw httpError(400, 'At least one generated pool is required.', 'ERR_POOLS_REQUIRED');
+      }
+
+      if (incomingPools.some((pool) => pool.division !== division)) {
+        throw httpError(400, 'Generated pools must use the selected division.', 'ERR_POOL_DIVISION');
+      }
+
+      const replaceDivisionPools = Boolean(payload.replaceDivisionPools);
+      const existingDivisionPools = event.pools.filter((pool) => pool.division === division);
+      const overwritesScoredPools = replaceDivisionPools && existingDivisionPools.some(hasStartedScoring);
+
+      if (overwritesScoredPools && payload.confirmOverwriteScored !== true) {
+        throw httpError(409, 'Replacing scored pools requires confirmation.', 'ERR_SCORED_POOLS_CONFIRMATION');
+      }
+
+      const firstDivisionIndex = event.pools.findIndex((pool) => pool.division === division);
+      const lastDivisionIndex = event.pools.reduce(
+        (lastIndex, pool, index) => (pool.division === division ? index : lastIndex),
+        -1
+      );
+      let pools;
+
+      if (replaceDivisionPools) {
+        const insertIndex = firstDivisionIndex >= 0 ? firstDivisionIndex : event.pools.length;
+        pools = event.pools.filter((pool) => pool.division !== division);
+        pools.splice(insertIndex, 0, ...incomingPools);
+      } else {
+        const insertIndex = lastDivisionIndex >= 0 ? lastDivisionIndex + 1 : event.pools.length;
+        pools = [...event.pools];
+        pools.splice(insertIndex, 0, ...incomingPools);
+      }
+
+      event.pools = pools;
+      event.activePoolId = incomingPools[0]?.id ?? event.activePoolId;
+      event.updatedAt = new Date().toISOString();
+      await writeEvent(event);
+      await publishEvent(event, 'event-updated');
       return json(response, { event });
     }
 
@@ -648,6 +705,14 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
     final: Boolean(match?.final),
     updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()
   };
+}
+
+function hasStartedScoring(pool) {
+  return (pool.matches ?? []).some(
+    (match) =>
+      match.final ||
+      (match.games ?? []).some((game) => wholeNumber(game.scoreA) > 0 || wholeNumber(game.scoreB) > 0)
+  );
 }
 
 async function buildCsvImportEvent(payload) {
