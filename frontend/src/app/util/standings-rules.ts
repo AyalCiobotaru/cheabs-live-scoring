@@ -68,7 +68,7 @@ export const buildMatchSummary = (pool: PoolState): string => {
   }
 
   const label = current ? 'Now' : 'Next';
-  return `${label}: ${teamName(pool, next.teamASeed)} vs ${teamName(pool, next.teamBSeed)} | Work: ${teamName(pool, next.refSeed)}`;
+  return `${label}:\n${teamName(pool, next.teamASeed)}\nvs\n${teamName(pool, next.teamBSeed)}\nWork: ${teamName(pool, next.refSeed)}`;
 };
 
 export const teamName = (pool: PoolState, seed: number | null): string => {
