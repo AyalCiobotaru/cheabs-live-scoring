@@ -54,6 +54,7 @@ export const buildSeededPools = (
 ): PoolState[] => {
   const teamsBySeed = new Map(seededTeams.map((team) => [team.seed, team]));
   const pools = seedPoolsForCount(seededTeams.length, prioritizeFiveTeamPools);
+  const normalizedMatchStartTimerMinutes = wholeNumber(matchStartTimerMinutes, 0, 99, 10);
 
   return pools.map((seeds, index) => {
     const teamCount = seeds.length as 4 | 5 | 6 | 7;
@@ -67,7 +68,7 @@ export const buildSeededPools = (
       gamesPerMatch: format.gamesPerMatch,
       targetScore: format.targetScore,
       pointCap: format.pointCap,
-      matchStartTimerMinutes,
+      matchStartTimerMinutes: normalizedMatchStartTimerMinutes,
       nextMatchStartAt: null,
       nextMatchStartSourceMatchId: null,
       teams: seeds.map((sourceSeed, teamIndex) => ({

@@ -509,6 +509,20 @@ button:disabled {
   gap: 12px 18px;
 }
 
+.seeded-timer-field {
+  align-items: center;
+  display: inline-grid;
+  flex: 0 1 auto;
+  gap: 8px;
+  grid-template-columns: 70px auto;
+}
+
+.seeded-timer-field input {
+  min-height: 34px;
+  padding: 6px 8px;
+  width: 70px;
+}
+
 .seeded-format-grid,
 .seeded-preview-grid {
   display: grid;

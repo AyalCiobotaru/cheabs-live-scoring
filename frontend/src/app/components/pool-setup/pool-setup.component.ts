@@ -186,7 +186,11 @@ export class PoolSetupComponent implements OnChanges {
   seededPoolSummary(pool: PoolState): string {
     return `${pool.teamCount} teams, ${pool.gamesPerMatch} game${pool.gamesPerMatch === 1 ? '' : 's'} to ${
       pool.targetScore
-    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}`;
+    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}`;
+  }
+
+  seededTimerSummary(pool: PoolState): string {
+    return pool.matchStartTimerMinutes > 0 ? `${pool.matchStartTimerMinutes} min between matches` : 'match timer off';
   }
 
   schedulePresetsForSize(size: number): SchedulePreset[] {

@@ -135,6 +135,16 @@
           <input type="checkbox" [(ngModel)]="prioritizeFiveTeamPools" (ngModelChange)="refreshSeededPreview()" />
           Prioritize 5 team pools
         </label>
+        <label class="seeded-timer-field">
+          <input
+            type="number"
+            min="0"
+            max="99"
+            [(ngModel)]="pool.matchStartTimerMinutes"
+            (ngModelChange)="refreshSeededPreview()"
+          />
+          <span>Minutes between matches</span>
+        </label>
       </div>
       <div class="seeded-format-grid">
         @for (row of primarySeededFormatRows; track row.size) {
