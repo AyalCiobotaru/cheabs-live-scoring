@@ -37,6 +37,7 @@ Set these values in `.env` for the API:
 
 - `ABLY_API_KEY` enables live sync.
 - `ADMIN_PASSWORD` allows admins to create events and edit pool setup.
+- `ADMIN_PASSWORDS` allows multiple admin passwords as a comma-separated list. You can use it by itself or alongside `ADMIN_PASSWORD`, for example `ADMIN_PASSWORDS=director-password,desk-password,backup-password`.
 - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` persist events, pool setup, and finalized matches for 31 days.
 
 ## Admin Import Workflows

@@ -990,15 +990,40 @@ function stripPoolImage(pool) {
 }
 
 function requireAdmin(request) {
-  const configured = process.env.ADMIN_PASSWORD;
+  const configuredPasswords = adminPasswords();
+  const providedPassword = adminPasswordFromRequest(request);
 
-  if (!configured) {
+  if (configuredPasswords.length === 0) {
     throw httpError(503, 'Admin password is not configured.', 'ERR_ADMIN_NOT_CONFIGURED');
   }
 
-  if (request.headers['x-admin-password'] !== configured) {
+  if (!providedPassword || !configuredPasswords.includes(providedPassword)) {
     throw httpError(401, 'Admin sign-in required.', 'ERR_ADMIN_REQUIRED');
   }
+}
+
+function adminPasswords() {
+  return [
+    ...splitAdminPasswords(process.env.ADMIN_PASSWORD),
+    ...splitAdminPasswords(process.env.ADMIN_PASSWORDS)
+  ];
+}
+
+function splitAdminPasswords(value) {
+  return String(value ?? '')
+    .split(/[\n,]/)
+    .map((password) => password.trim())
+    .filter(Boolean);
+}
+
+function adminPasswordFromRequest(request) {
+  const header = request.headers['x-admin-password'];
+
+  if (Array.isArray(header)) {
+    return header[0] ?? '';
+  }
+
+  return typeof header === 'string' ? header : '';
 }
 
 async function readJson(request) {
