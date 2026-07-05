@@ -165,6 +165,7 @@ export class PoolSetupComponent implements OnChanges {
       this.seededFormats,
       this.replaceDivisionPools ? 1 : this.existingDivisionPoolCount + 1,
       this.pool.matchStartTimerMinutes,
+      this.pool.hidden,
       this.prioritizeFiveTeamPools
     );
   }
@@ -186,7 +187,9 @@ export class PoolSetupComponent implements OnChanges {
   seededPoolSummary(pool: PoolState): string {
     return `${pool.teamCount} teams, ${pool.gamesPerMatch} game${pool.gamesPerMatch === 1 ? '' : 's'} to ${
       pool.targetScore
-    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}`;
+    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}, ${
+      pool.hidden ? 'hidden' : 'visible'
+    }`;
   }
 
   seededTimerSummary(pool: PoolState): string {

@@ -24,8 +24,13 @@ export class EventDashboardComponent {
   @Output() poolSelected = new EventEmitter<string>();
   @Output() timerSelected = new EventEmitter<string>();
   @Output() poolDeleted = new EventEmitter<string>();
+  @Output() divisionPublished = new EventEmitter<string>();
 
   isFavorite(poolId: string): boolean {
     return this.favoritePoolIds.includes(poolId);
+  }
+
+  hiddenPoolCount(group: DivisionPoolGroup): number {
+    return group.cards.filter((card) => card.pool.hidden).length;
   }
 }

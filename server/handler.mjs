@@ -224,7 +224,7 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
       }
 
-      return json(response, { event });
+      return json(response, { event: isAdminRequest(request) ? event : publicEvent(event) });
     }
 
     if (bulkPoolsMatch && request.method === 'PUT') {
@@ -316,7 +316,11 @@ export async function handleApiRequest(request, response) {
       event.activePoolId = pool.id;
       event.updatedAt = new Date().toISOString();
       await writeEvent(event);
-      await publishPoolSetup(event.code, pool);
+      if (pool.hidden) {
+        await publishEvent(event, 'event-updated');
+      } else {
+        await publishPoolSetup(event.code, pool);
+      }
       return json(response, { event });
     }
 
@@ -357,6 +361,10 @@ export async function handleApiRequest(request, response) {
       const pool = event.pools.find((candidate) => candidate.id === poolId);
 
       if (!pool) {
+        throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
+      }
+
+      if (pool.hidden && !isAdminRequest(request)) {
         throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
       }
 
@@ -438,7 +446,7 @@ async function publishEvent(event, kind) {
     kind,
     message: 'Scoring event update.',
     updatedAt: new Date().toISOString(),
-    event: stripEventImages(event)
+    event: publicEvent(event)
   });
 }
 
@@ -624,6 +632,7 @@ function sanitizePool(pool) {
     id,
     title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
     division: normalizeDivision(pool.division),
+    hidden: Boolean(pool.hidden),
     teamCount,
     gamesPerMatch,
     targetScore,
@@ -982,6 +991,20 @@ function stripEventImages(event) {
   };
 }
 
+function publicEvent(event) {
+  const eventWithoutImages = stripEventImages(event);
+  const pools = eventWithoutImages.pools.filter((pool) => !pool.hidden);
+  const activePoolId = pools.some((pool) => pool.id === eventWithoutImages.activePoolId)
+    ? eventWithoutImages.activePoolId
+    : (pools[0]?.id ?? null);
+
+  return {
+    ...eventWithoutImages,
+    pools,
+    activePoolId
+  };
+}
+
 function stripPoolImage(pool) {
   return {
     ...pool,
@@ -1000,6 +1023,13 @@ function requireAdmin(request) {
   if (!providedPassword || !configuredPasswords.includes(providedPassword)) {
     throw httpError(401, 'Admin sign-in required.', 'ERR_ADMIN_REQUIRED');
   }
+}
+
+function isAdminRequest(request) {
+  const configuredPasswords = adminPasswords();
+  const providedPassword = adminPasswordFromRequest(request);
+
+  return Boolean(providedPassword && configuredPasswords.includes(providedPassword));
 }
 
 function adminPasswords() {

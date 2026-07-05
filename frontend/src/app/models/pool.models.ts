@@ -23,6 +23,7 @@ export interface PoolState {
   id: string;
   title: string;
   division: string;
+  hidden: boolean;
   teamCount: number;
   gamesPerMatch: number;
   targetScore: number;

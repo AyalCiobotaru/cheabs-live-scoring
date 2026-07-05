@@ -203,6 +203,18 @@ h4 {
   font-weight: 800;
 }
 
+.division-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.division-heading-actions button {
+  padding: 7px 10px;
+}
+
 .event-title,
 .pool-card header {
   align-items: center;
@@ -251,6 +263,18 @@ h4 {
 
 .pool-card-delete {
   flex: 0 0 auto;
+}
+
+.pool-hidden-badge {
+  background: #fff8e8;
+  border: 1px solid #e1c582;
+  border-radius: 999px;
+  color: #6d4f08;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  text-transform: uppercase;
 }
 
 .favorite-toggle {

@@ -171,9 +171,13 @@ export class ScoringRealtimeService {
   }
 
   private eventWithoutImages(event: EventState): EventState {
+    const pools = event.pools.filter((pool) => !pool.hidden);
+    const activePoolId = pools.some((pool) => pool.id === event.activePoolId) ? event.activePoolId : (pools[0]?.id ?? null);
+
     return {
       ...event,
-      pools: event.pools.map((pool) => ({
+      activePoolId,
+      pools: pools.map((pool) => ({
         ...pool,
         imagePreview: null
       }))

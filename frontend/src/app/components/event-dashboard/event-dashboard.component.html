@@ -25,7 +25,14 @@
         <section class="division-group">
           <div class="division-heading">
             <h3>{{ group.division }}</h3>
-            <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
+            <div class="division-heading-actions">
+              <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
+              @if (isAdmin && hiddenPoolCount(group) > 0) {
+                <button type="button" class="secondary" (click)="divisionPublished.emit(group.division)">
+                  Publish {{ hiddenPoolCount(group) }}
+                </button>
+              }
+            </div>
           </div>
           <div class="pool-grid">
             @for (card of group.cards; track card.pool.id) {
@@ -39,6 +46,9 @@
               >
                 <div class="pool-card-heading">
                   <h4 class="pool-card-title">{{ card.pool.title }}</h4>
+                  @if (isAdmin && card.pool.hidden) {
+                    <span class="pool-hidden-badge">Hidden</span>
+                  }
                   <button
                     type="button"
                     class="secondary icon-button favorite-toggle"

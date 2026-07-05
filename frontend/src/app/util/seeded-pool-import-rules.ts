@@ -20,6 +20,7 @@ export const buildSeededImportPreview = (
   formats: SeededImportFormats,
   startingPoolNumber: number,
   matchStartTimerMinutes: number,
+  hidden: boolean,
   prioritizeFiveTeamPools = false
 ): SeededImportPreview => {
   const { teams, errors, warnings } = parseSeededTeams(fileText);
@@ -32,6 +33,7 @@ export const buildSeededImportPreview = (
           formats,
           startingPoolNumber,
           matchStartTimerMinutes,
+          hidden,
           prioritizeFiveTeamPools
         )
       : [];
@@ -50,6 +52,7 @@ export const buildSeededPools = (
   formats: SeededImportFormats,
   startingPoolNumber: number,
   matchStartTimerMinutes: number,
+  hidden: boolean,
   prioritizeFiveTeamPools = false
 ): PoolState[] => {
   const teamsBySeed = new Map(seededTeams.map((team) => [team.seed, team]));
@@ -64,6 +67,7 @@ export const buildSeededPools = (
       id: createId(),
       title: `Pool ${startingPoolNumber + index}`,
       division,
+      hidden,
       teamCount,
       gamesPerMatch: format.gamesPerMatch,
       targetScore: format.targetScore,

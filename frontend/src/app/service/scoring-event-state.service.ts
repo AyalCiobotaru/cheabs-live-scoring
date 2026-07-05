@@ -64,7 +64,7 @@ export class ScoringEventStateService {
   readonly realtimeStatus$ = this.realtime.status$;
 
   adminPassword = sessionStorage.getItem(ADMIN_PASSWORD_KEY) ?? '';
-  isAdmin = Boolean(this.adminPassword);
+  isAdmin = false;
   event: EventState | null = null;
   eventCode = localStorage.getItem(CURRENT_EVENT_KEY) ?? '';
   eventName = '';
@@ -142,11 +142,11 @@ export class ScoringEventStateService {
       return this.draftPool;
     }
 
-    return this.event?.pools.find((pool) => pool.id === this.activePoolId) ?? null;
+    return this.event?.pools.find((pool) => pool.id === this.activePoolId && this.canViewPool(pool)) ?? null;
   }
 
   get poolCards(): PoolCard[] {
-    return this.event?.pools.map((pool) => buildPoolCard(pool)) ?? [];
+    return this.event?.pools.filter((pool) => this.canViewPool(pool)).map((pool) => buildPoolCard(pool)) ?? [];
   }
 
   get allDivisionPoolGroups(): DivisionPoolGroup[] {
@@ -238,7 +238,9 @@ export class ScoringEventStateService {
     this.bump();
 
     try {
-      const response = await fetch(`/api/scoring/events/${code}`);
+      const response = await fetch(`/api/scoring/events/${code}`, {
+        headers: this.isAdmin ? this.adminHeaders() : undefined
+      });
 
       if (!response.ok) {
         throw new Error(await this.errorMessage(response));
@@ -331,6 +333,12 @@ export class ScoringEventStateService {
       this.showingAdminSignIn = false;
       sessionStorage.setItem(ADMIN_PASSWORD_KEY, this.adminPassword);
 
+      if (this.event) {
+        const code = this.event.code;
+        this.event = null;
+        await this.loadEvent(code);
+      }
+
       if (this.pendingAdminRoute) {
         const route = this.pendingAdminRoute;
         this.pendingAdminRoute = null;
@@ -348,6 +356,11 @@ export class ScoringEventStateService {
     this.showingAdminSignIn = false;
     this.adminPassword = '';
     sessionStorage.removeItem(ADMIN_PASSWORD_KEY);
+    if (this.event) {
+      this.event = this.normalizeEvent(this.event);
+      this.activePoolId = this.event.activePoolId;
+      this.persistLocal();
+    }
     this.bump();
   }
 
@@ -467,7 +480,7 @@ export class ScoringEventStateService {
       return false;
     }
 
-    const exists = this.event.pools.some((pool) => pool.id === poolId);
+    const exists = this.event.pools.some((pool) => pool.id === poolId && this.canViewPool(pool));
 
     if (exists) {
       this.event.activePoolId = poolId;
@@ -479,7 +492,7 @@ export class ScoringEventStateService {
   }
 
   redirectInvalidPool(poolId: string | null): void {
-    if (!this.event || !poolId || this.event.pools.some((pool) => pool.id === poolId)) {
+    if (!this.event || !poolId || this.event.pools.some((pool) => pool.id === poolId && this.canViewPool(pool))) {
       return;
     }
 
@@ -645,6 +658,27 @@ export class ScoringEventStateService {
     this.expandedMatchId = null;
     this.persistLocal();
     await this.router.navigate(['/events', this.event.code]);
+    this.bump();
+  }
+
+  async publishDivision(division: string): Promise<void> {
+    if (!this.event || !this.isAdmin) {
+      return;
+    }
+
+    const poolsToPublish = this.event.pools.filter((pool) => pool.division === division && pool.hidden);
+
+    if (poolsToPublish.length === 0) {
+      return;
+    }
+
+    for (const pool of poolsToPublish) {
+      pool.hidden = false;
+      pool.updatedAt = new Date().toISOString();
+      await this.persistPoolSetup(pool);
+    }
+
+    this.persistLocal();
     this.bump();
   }
 
@@ -909,7 +943,9 @@ export class ScoringEventStateService {
     this.showSideSwitchToastIfNeeded(pool, match, game);
     this.touchMatch(pool, match);
     this.persistLocal();
-    this.realtime.publishMatch(pool, match);
+    if (!pool.hidden) {
+      this.realtime.publishMatch(pool, match);
+    }
     this.bump();
   }
 
@@ -931,8 +967,10 @@ export class ScoringEventStateService {
 
     this.touchMatch(pool, match);
     this.persistLocal();
-    this.realtime.publishMatch(pool, match);
-    if (timerAction) {
+    if (!pool.hidden) {
+      this.realtime.publishMatch(pool, match);
+    }
+    if (timerAction && !pool.hidden) {
       this.realtime.publishPoolTimer(pool);
     }
 
@@ -950,7 +988,9 @@ export class ScoringEventStateService {
     if (expanded && pool && match && this.clearPoolTimer(pool)) {
       this.touchPool(pool);
       this.persistLocal();
-      this.realtime.publishPoolTimer(pool);
+      if (!pool.hidden) {
+        this.realtime.publishPoolTimer(pool);
+      }
       void this.persistMatch(pool, match, 'clear');
     }
 
@@ -1063,7 +1103,7 @@ export class ScoringEventStateService {
 
     const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}/matches/${match.id}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: pool.hidden && this.isAdmin ? this.adminHeaders() : { 'content-type': 'application/json' },
       body: JSON.stringify({ match, timerAction })
     });
 
@@ -1092,6 +1132,19 @@ export class ScoringEventStateService {
     const pool = this.normalizePool(remote);
     const existingIndex = this.event.pools.findIndex((candidate) => candidate.id === pool.id);
     this.applyingRemoteState = true;
+
+    if (pool.hidden && !this.isAdmin) {
+      if (existingIndex >= 0) {
+        this.event.pools = this.event.pools.filter((candidate) => candidate.id !== pool.id);
+        this.event.activePoolId =
+          this.event.activePoolId === pool.id ? (this.event.pools[0]?.id ?? null) : this.event.activePoolId;
+      }
+
+      this.persistLocal();
+      this.applyingRemoteState = false;
+      this.bump();
+      return;
+    }
 
     if (existingIndex >= 0) {
       this.event.pools = this.event.pools.map((candidate) => (candidate.id === pool.id ? pool : candidate));
@@ -1197,11 +1250,16 @@ export class ScoringEventStateService {
       }
     }
 
+    const mergedPools = this.isAdmin ? [...pools.values()] : [...pools.values()].filter((pool) => !pool.hidden);
+    const activePoolId = mergedPools.some((pool) => pool.id === local.activePoolId)
+      ? local.activePoolId
+      : (remote.activePoolId ?? mergedPools[0]?.id ?? null);
+
     return {
       ...local,
       name: remote.name || local.name,
-      pools: [...pools.values()],
-      activePoolId: local.activePoolId ?? remote.activePoolId,
+      pools: mergedPools,
+      activePoolId: mergedPools.some((pool) => pool.id === activePoolId) ? activePoolId : (mergedPools[0]?.id ?? null),
       updatedAt: this.isNewer(remote.updatedAt, local.updatedAt) ? remote.updatedAt : local.updatedAt
     };
   }
@@ -1228,7 +1286,8 @@ export class ScoringEventStateService {
   }
 
   private normalizeEvent(event: EventState): EventState {
-    const pools = Array.isArray(event.pools) ? event.pools.map((pool) => this.normalizePool(pool)) : [];
+    const normalizedPools = Array.isArray(event.pools) ? event.pools.map((pool) => this.normalizePool(pool)) : [];
+    const pools = this.isAdmin ? normalizedPools : normalizedPools.filter((pool) => !pool.hidden);
     const activePoolId =
       typeof event.activePoolId === 'string' && pools.some((pool) => pool.id === event.activePoolId)
         ? event.activePoolId
@@ -1266,6 +1325,7 @@ export class ScoringEventStateService {
       id: typeof pool.id === 'string' && pool.id.trim() ? pool.id : baseline.id,
       title: typeof pool.title === 'string' && pool.title.trim() ? pool.title : baseline.title,
       division: normalizeDivision(pool.division),
+      hidden: Boolean(pool.hidden),
       teamCount,
       gamesPerMatch,
       targetScore,
@@ -1461,9 +1521,13 @@ export class ScoringEventStateService {
   }
 
   private eventWithoutImages(event: EventState): EventState {
+    const pools = this.isAdmin ? event.pools : event.pools.filter((pool) => !pool.hidden);
+    const activePoolId = pools.some((pool) => pool.id === event.activePoolId) ? event.activePoolId : (pools[0]?.id ?? null);
+
     return {
       ...event,
-      pools: event.pools.map((pool) => ({
+      activePoolId,
+      pools: pools.map((pool) => ({
         ...pool,
         imagePreview: null
       }))
@@ -1475,6 +1539,10 @@ export class ScoringEventStateService {
       ...pool,
       imagePreview: null
     };
+  }
+
+  private canViewPool(pool: PoolState): boolean {
+    return this.isAdmin || !pool.hidden;
   }
 
   private clonePool(pool: PoolState): PoolState {
