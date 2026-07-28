@@ -184,6 +184,26 @@ h4 {
   gap: 10px;
 }
 
+.division-subgroup {
+  display: grid;
+  gap: 10px;
+}
+
+.division-subgroup summary {
+  align-items: center;
+  color: #34465c;
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.division-subgroup summary button {
+  padding: 7px 10px;
+}
+
 .division-heading {
   align-items: center;
   display: flex;

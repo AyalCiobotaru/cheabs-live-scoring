@@ -88,6 +88,14 @@
       <input [(ngModel)]="pool.title" (ngModelChange)="saved.emit()" [disabled]="!isAdmin || setupMode === 'seeded'" />
     </label>
     <label>
+      Category
+      <select [(ngModel)]="pool.category" (ngModelChange)="saved.emit(); refreshSeededPreview()" [disabled]="!isAdmin">
+        @for (category of categoryOptions; track category) {
+          <option [ngValue]="category">{{ category }}</option>
+        }
+      </select>
+    </label>
+    <label>
       Division
       <select [(ngModel)]="pool.division" (ngModelChange)="saved.emit(); refreshSeededPreview()" [disabled]="!isAdmin">
         @for (division of divisionOptions; track division) {
@@ -547,7 +555,7 @@
                     &darr;
                   </button>
                 </div>
-                <button type="button" class="danger" (click)="matchRemoved.emit(match.id)">Remove</button>
+                <button type="button" class="danger icon-button" (click)="matchRemoved.emit(match.id)">Remove</button>
               }
             </div>
           }

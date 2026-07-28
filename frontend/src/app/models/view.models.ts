@@ -17,6 +17,13 @@ export interface PoolCard {
 }
 
 export interface DivisionPoolGroup {
+  category: string;
   division: string;
+  cards: PoolCard[];
+}
+
+export interface CategoryPoolGroup {
+  category: string;
+  divisions: DivisionPoolGroup[];
   cards: PoolCard[];
 }

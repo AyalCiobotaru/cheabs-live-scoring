@@ -137,7 +137,7 @@
         @if (canEditSetup) {
           <button type="button" class="secondary" (click)="movedUp.emit()" [disabled]="first">Move up</button>
           <button type="button" class="secondary" (click)="movedDown.emit()" [disabled]="last">Move down</button>
-          <button type="button" class="danger" (click)="removed.emit()">Remove</button>
+          <button type="button" class="danger icon-button" (click)="removed.emit()">Remove</button>
         }
       </div>
     </section>

@@ -9,6 +9,7 @@ export const TEAM_COUNT_OPTIONS = [3, 4, 5, 6, 7];
 export const createDefaultPool = (title = 'Pool'): PoolState => ({
   id: createId(),
   title,
+  category: 'Men',
   division: DIVISION_OPTIONS[0],
   hidden: true,
   editable: true,

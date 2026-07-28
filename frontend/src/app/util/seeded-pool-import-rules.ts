@@ -16,6 +16,7 @@ export const DEFAULT_SEEDED_IMPORT_FORMATS: SeededImportFormats = {
 
 export const buildSeededImportPreview = (
   fileText: string,
+  category: string,
   division: string,
   formats: SeededImportFormats,
   startingPoolNumber: number,
@@ -31,6 +32,7 @@ export const buildSeededImportPreview = (
     errors.length === 0
       ? buildSeededPools(
           sortedTeams,
+          category,
           division,
           formats,
           startingPoolNumber,
@@ -52,6 +54,7 @@ export const buildSeededImportPreview = (
 
 export const buildSeededPools = (
   seededTeams: Team[],
+  category: string,
   division: string,
   formats: SeededImportFormats,
   startingPoolNumber: number,
@@ -73,6 +76,7 @@ export const buildSeededPools = (
     return {
       id: createId(),
       title: `Pool ${startingPoolNumber + index}`,
+      category,
       division,
       hidden,
       editable,

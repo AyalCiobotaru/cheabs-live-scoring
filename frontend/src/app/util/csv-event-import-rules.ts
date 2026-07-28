@@ -216,7 +216,10 @@ const buildPreview = (fileName: string, parsed: ParsedCsv): CsvImportPreview => 
     }
 
     if (pointCap != null && pointCap < targetScore) {
-      errors.push({ lineNumber: pool.firstLineNumber, message: '"point_cap" must be greater than or equal to target_score.' });
+      errors.push({
+        lineNumber: pool.firstLineNumber,
+        message: '"point_cap" must be greater than or equal to target_score.'
+      });
     }
 
     if (!pool.settings['games_per_match']) {
@@ -255,11 +258,17 @@ const buildPreview = (fileName: string, parsed: ParsedCsv): CsvImportPreview => 
     }
 
     if (pool.teams.length > teamCount) {
-      errors.push({ lineNumber: pool.firstLineNumber, message: `More than ${teamCount} teams in pool_key "${pool.key}".` });
+      errors.push({
+        lineNumber: pool.firstLineNumber,
+        message: `More than ${teamCount} teams in pool_key "${pool.key}".`
+      });
     }
 
     if (pool.teams.length < teamCount) {
-      errors.push({ lineNumber: pool.firstLineNumber, message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".` });
+      errors.push({
+        lineNumber: pool.firstLineNumber,
+        message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".`
+      });
     }
 
     if (pool.settings['schedule_preset'] && pool.settings['schedule_preset'] !== 'default') {
@@ -269,6 +278,7 @@ const buildPreview = (fileName: string, parsed: ParsedCsv): CsvImportPreview => 
     return {
       key: pool.key,
       title: pool.settings['pool_title'] || 'Pool',
+      category: 'Men',
       division: pool.settings['division'],
       teamCount,
       gamesPerMatch,

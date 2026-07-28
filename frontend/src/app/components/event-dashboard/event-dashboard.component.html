@@ -19,79 +19,94 @@
   </div>
 
   @if (poolCards.length) {
-    @if (visibleDivisionPoolGroups.length) {
+    @if (visibleCategoryPoolGroups.length) {
       <section class="division-groups">
-        @for (group of visibleDivisionPoolGroups; track group.division) {
+        @for (categoryGroup of visibleCategoryPoolGroups; track categoryGroup.category) {
           <section class="division-group">
             <div class="division-heading">
-              <h3>{{ group.division }}</h3>
+              <h3>{{ categoryGroup.category }}</h3>
               <div class="division-heading-actions">
-                <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
-                @if (isAdmin && hiddenPoolCount(group) > 0) {
-                  <button type="button" class="secondary" (click)="divisionPublished.emit(group.division)">
-                    Publish {{ hiddenPoolCount(group) }}
-                  </button>
-                }
+                <span>{{ categoryGroup.cards.length }} pool{{ categoryGroup.cards.length === 1 ? '' : 's' }}</span>
               </div>
             </div>
-            <div class="pool-grid">
-              @for (card of group.cards; track card.pool.id) {
-                <article
-                  class="pool-card"
-                  role="button"
-                  tabindex="0"
-                  (click)="poolSelected.emit(card.pool.id)"
-                  (keydown.enter)="poolSelected.emit(card.pool.id)"
-                  (keydown.space)="$event.preventDefault(); poolSelected.emit(card.pool.id)"
-                >
-                  <div class="pool-card-heading">
-                    <h4 class="pool-card-title">
-                      {{ card.pool.title }} - Court {{ card.pool.courtNumbers }}
-                      @if (!card.pool.editable) {
-                        <span
-                          class="locked-pool-icon"
-                          title="Scoring is locked for this pool."
-                          aria-label="Scoring is closed"
-                          >&#128274;</span
-                        >
-                      }
-                    </h4>
-                    @if (isAdmin && card.pool.hidden) {
-                      <span class="pool-hidden-badge">Hidden</span>
-                    }
+            @for (group of categoryGroup.divisions; track group.category + group.division) {
+              <details class="division-subgroup" open>
+                <summary>
+                  <span>{{ group.division }}</span>
+                  <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
+                  @if (isAdmin && hiddenPoolCount(group) > 0) {
                     <button
                       type="button"
-                      class="secondary icon-button favorite-toggle"
-                      [class.active]="isFavorite(card.pool.id)"
-                      [attr.aria-label]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
-                      [title]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
-                      (click)="$event.stopPropagation(); poolFavoriteToggled.emit(card.pool.id)"
+                      class="secondary"
+                      (click)="
+                        $event.preventDefault();
+                        divisionPublished.emit({ category: group.category, division: group.division })
+                      "
                     >
-                      {{ isFavorite(card.pool.id) ? '★' : '☆' }}
+                      Publish {{ hiddenPoolCount(group) }}
                     </button>
-                    @if (isAdmin) {
-                      <button
-                        type="button"
-                        class="danger icon-button pool-card-delete"
-                        aria-label="Delete pool"
-                        title="Delete pool"
-                        (click)="$event.stopPropagation(); poolDeleted.emit(card.pool.id)"
-                      >
-                        &times;
-                      </button>
-                    }
-                  </div>
-                  <app-pool-summary
-                    [pool]="card.pool"
-                    [standings]="card.standings"
-                    [matchSummary]="card.matchSummary"
-                    [completedMatches]="card.completedMatches"
-                    [totalMatches]="card.totalMatches"
-                    (timerSelected)="timerSelected.emit(card.pool.id)"
-                  ></app-pool-summary>
-                </article>
-              }
-            </div>
+                  }
+                </summary>
+                <div class="pool-grid">
+                  @for (card of group.cards; track card.pool.id) {
+                    <article
+                      class="pool-card"
+                      role="button"
+                      tabindex="0"
+                      (click)="poolSelected.emit(card.pool.id)"
+                      (keydown.enter)="poolSelected.emit(card.pool.id)"
+                      (keydown.space)="$event.preventDefault(); poolSelected.emit(card.pool.id)"
+                    >
+                      <div class="pool-card-heading">
+                        <h4 class="pool-card-title">
+                          {{ card.pool.title }} - Court {{ card.pool.courtNumbers }}
+                          @if (!card.pool.editable) {
+                            <span
+                              class="locked-pool-icon"
+                              title="Scoring is locked for this pool."
+                              aria-label="Scoring is closed"
+                              >&#128274;</span
+                            >
+                          }
+                        </h4>
+                        @if (isAdmin && card.pool.hidden) {
+                          <span class="pool-hidden-badge">Hidden</span>
+                        }
+                        <button
+                          type="button"
+                          class="secondary icon-button favorite-toggle"
+                          [class.active]="isFavorite(card.pool.id)"
+                          [attr.aria-label]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
+                          [title]="isFavorite(card.pool.id) ? 'Remove favorite' : 'Add favorite'"
+                          (click)="$event.stopPropagation(); poolFavoriteToggled.emit(card.pool.id)"
+                        >
+                          {{ isFavorite(card.pool.id) ? '★' : '☆' }}
+                        </button>
+                        @if (isAdmin) {
+                          <button
+                            type="button"
+                            class="danger icon-button pool-card-delete"
+                            aria-label="Delete pool"
+                            title="Delete pool"
+                            (click)="$event.stopPropagation(); poolDeleted.emit(card.pool.id)"
+                          >
+                            &times;
+                          </button>
+                        }
+                      </div>
+                      <app-pool-summary
+                        [pool]="card.pool"
+                        [standings]="card.standings"
+                        [matchSummary]="card.matchSummary"
+                        [completedMatches]="card.completedMatches"
+                        [totalMatches]="card.totalMatches"
+                        (timerSelected)="timerSelected.emit(card.pool.id)"
+                      ></app-pool-summary>
+                    </article>
+                  }
+                </div>
+              </details>
+            }
           </section>
         }
       </section>

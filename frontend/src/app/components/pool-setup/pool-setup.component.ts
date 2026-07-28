@@ -28,6 +28,7 @@ export class PoolSetupComponent implements OnChanges {
   @Input({ required: true }) pool!: PoolState;
   @Input({ required: true }) isAdmin = false;
   @Input({ required: true }) teamCountOptions: number[] = [];
+  @Input({ required: true }) categoryOptions: string[] = [];
   @Input({ required: true }) divisionOptions: string[] = [];
   @Input({ required: true }) schedulePresets: SchedulePreset[] = [];
   @Input({ required: true }) existingDivisionPoolCount = 0;
@@ -48,6 +49,7 @@ export class PoolSetupComponent implements OnChanges {
   @Output() setupCanceled = new EventEmitter<void>();
   @Output() seededPoolsCreated = new EventEmitter<{
     pools: PoolState[];
+    category: string;
     division: string;
     replaceDivisionPools: boolean;
   }>();
@@ -176,6 +178,7 @@ export class PoolSetupComponent implements OnChanges {
 
     this.seededImportPreview = buildSeededImportPreview(
       this.seededImportText,
+      this.pool.category,
       this.pool.division,
       this.seededFormats,
       this.replaceDivisionPools ? 1 : this.existingDivisionPoolCount + 1,
@@ -196,6 +199,7 @@ export class PoolSetupComponent implements OnChanges {
 
     this.seededPoolsCreated.emit({
       pools: preview.pools,
+      category: this.pool.category,
       division: this.pool.division,
       replaceDivisionPools: this.replaceDivisionPools
     });

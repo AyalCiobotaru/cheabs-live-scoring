@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { DivisionPoolGroup, EventState, PoolCard } from '../../models';
+import { CategoryPoolGroup, DivisionPoolGroup, EventState, PoolCard } from '../../models';
 import { PoolSummaryComponent } from '../pool-summary/pool-summary.component';
 
 @Component({
@@ -12,7 +12,7 @@ export class EventDashboardComponent {
   @Input({ required: true }) event!: EventState;
   @Input({ required: true }) isAdmin = false;
   @Input({ required: true }) poolCards: PoolCard[] = [];
-  @Input({ required: true }) visibleDivisionPoolGroups: DivisionPoolGroup[] = [];
+  @Input({ required: true }) visibleCategoryPoolGroups: CategoryPoolGroup[] = [];
   @Input({ required: true }) favoritePoolIds: string[] = [];
   @Input({ required: true }) showingFavoritePools = false;
   @Input({ required: true }) favoritePoolCount = 0;
@@ -24,7 +24,7 @@ export class EventDashboardComponent {
   @Output() poolSelected = new EventEmitter<string>();
   @Output() timerSelected = new EventEmitter<string>();
   @Output() poolDeleted = new EventEmitter<string>();
-  @Output() divisionPublished = new EventEmitter<string>();
+  @Output() divisionPublished = new EventEmitter<{ category: string; division: string }>();
 
   isFavorite(poolId: string): boolean {
     return this.favoritePoolIds.includes(poolId);

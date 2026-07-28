@@ -19,9 +19,6 @@
   </div>
   <nav class="side-menu-actions">
     @if (hasEvent) {
-      <button type="button" class="menu-action" [class.active]="!showingFavoritePools" (click)="selectPools()">
-        Pools
-      </button>
       <button type="button" class="menu-action" [class.active]="showingFavoritePools" (click)="selectFavorites()">
         <span>Favorites</span>
         <small>{{ favoritePoolCount }}</small>
@@ -36,38 +33,38 @@
   </nav>
   @if (hasEvent && poolCount > 0) {
     <div class="side-menu-divider"></div>
-    <button
-      type="button"
-      class="menu-action divisions-control"
-      [attr.aria-expanded]="divisionsExpanded"
-      (click)="toggleDivisions()"
-    >
-      <span>Divisions</span>
-      <span class="dropdown-arrow" [class.open]="divisionsExpanded" aria-hidden="true"></span>
-    </button>
-    @if (divisionsExpanded) {
-      <div class="division-dropdown">
+    <div class="division-dropdown">
+      <button
+        type="button"
+        class="division-item"
+        [class.active]="!showingFavoritePools && !selectedCategory && !selectedDivision"
+        (click)="selectPools()"
+      >
+        <span>Event Overview</span>
+        <small>{{ poolCount }}</small>
+      </button>
+      @for (category of divisionOptions; track category.category) {
         <button
           type="button"
           class="division-item"
-          [class.active]="!selectedDivision && !showingFavoritePools"
-          (click)="selectDivision(null)"
+          [class.active]="selectedCategory === category.category && !selectedDivision"
+          (click)="selectDivision(category.category, null)"
         >
-          <span>All divisions</span>
-          <small>{{ poolCount }}</small>
+          <span>{{ category.category }}</span>
+          <small>{{ category.cards.length }}</small>
         </button>
-        @for (option of divisionOptions; track option.division) {
+        @for (option of category.divisions; track option.category + option.division) {
           <button
             type="button"
-            class="division-item"
-            [class.active]="selectedDivision === option.division"
-            (click)="selectDivision(option.division)"
+            class="division-item division-child"
+            [class.active]="selectedCategory === category.category && selectedDivision === option.division"
+            (click)="selectDivision(category.category, option.division)"
           >
             <span>{{ option.division }}</span>
             <small>{{ option.count }}</small>
           </button>
         }
-      </div>
-    }
+      }
+    </div>
   }
 </aside>

@@ -15,6 +15,7 @@ export interface CsvImportIssue {
 export interface CsvImportPoolPreview {
   key: string;
   title: string;
+  category: string;
   division: string;
   teamCount: number;
   gamesPerMatch: number;

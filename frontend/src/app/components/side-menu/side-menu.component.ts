@@ -1,8 +1,15 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 export interface DivisionFilterOption {
+  category: string;
   division: string;
   count: number;
+}
+
+export interface CategoryFilterOption {
+  category: string;
+  divisions: DivisionFilterOption[];
+  cards: unknown[];
 }
 
 @Component({
@@ -16,19 +23,19 @@ export class SideMenuComponent {
   @Input() isAdmin = false;
   @Input() poolCount = 0;
   @Input() favoritePoolCount = 0;
+  @Input() selectedCategory: string | null = null;
   @Input() selectedDivision: string | null = null;
   @Input() showingFavoritePools = false;
-  @Input() divisionOptions: DivisionFilterOption[] = [];
+  @Input() divisionOptions: CategoryFilterOption[] = [];
 
   @Output() poolsSelected = new EventEmitter<void>();
   @Output() favoritesSelected = new EventEmitter<void>();
   @Output() chooseEventSelected = new EventEmitter<void>();
   @Output() adminSelected = new EventEmitter<void>();
   @Output() adminSignOutSelected = new EventEmitter<void>();
-  @Output() divisionSelected = new EventEmitter<string | null>();
+  @Output() divisionSelected = new EventEmitter<{ category: string; division: string | null } | null>();
 
   menuOpen = false;
-  divisionsExpanded = false;
 
   toggleMenu(): void {
     this.menuOpen = !this.menuOpen;
@@ -36,10 +43,6 @@ export class SideMenuComponent {
 
   closeMenu(): void {
     this.menuOpen = false;
-  }
-
-  toggleDivisions(): void {
-    this.divisionsExpanded = !this.divisionsExpanded;
   }
 
   selectPools(): void {
@@ -67,8 +70,8 @@ export class SideMenuComponent {
     this.closeMenu();
   }
 
-  selectDivision(division: string | null): void {
-    this.divisionSelected.emit(division);
+  selectDivision(category: string, division: string | null): void {
+    this.divisionSelected.emit({ category, division });
     this.closeMenu();
   }
 }

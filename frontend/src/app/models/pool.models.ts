@@ -23,6 +23,7 @@ export interface Match {
 export interface PoolState {
   id: string;
   title: string;
+  category: string;
   division: string;
   hidden: boolean;
   editable: boolean;

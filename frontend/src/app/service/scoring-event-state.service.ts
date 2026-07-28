@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import {
   DivisionPoolGroup,
+  CategoryPoolGroup,
   CsvImportResponse,
   CsvImportRow,
   EventState,
@@ -16,7 +17,14 @@ import {
   SheetScanResult,
   TeamStanding
 } from '../models';
-import { DIVISION_OPTIONS, divisionSortIndex, normalizeDivision } from '../util/division-rules';
+import {
+  DIVISION_OPTIONS,
+  POOL_CATEGORY_OPTIONS,
+  divisionSortIndex,
+  normalizeDivision,
+  normalizePoolCategory,
+  poolCategorySortIndex
+} from '../util/division-rules';
 import {
   createDefaultPool,
   createGames,
@@ -60,6 +68,7 @@ export class ScoringEventStateService {
 
   readonly version = signal(0);
   readonly teamCountOptions = TEAM_COUNT_OPTIONS;
+  readonly categoryOptions = [...POOL_CATEGORY_OPTIONS];
   readonly divisionOptions = DIVISION_OPTIONS;
   readonly schedulePresets = SCHEDULE_PRESETS;
   readonly realtimeStatus$ = this.realtime.status$;
@@ -81,6 +90,7 @@ export class ScoringEventStateService {
   scanSummary: ScanSummary | null = null;
   scanStatus: 'idle' | 'scanning' | 'success' | 'failed' = 'idle';
   sideSwitchToast: SideSwitchToast | null = null;
+  selectedCategory: string | null = null;
   selectedDivision: string | null = null;
   showingFavoritePools = false;
   favoritePoolIds = new Set<string>();
@@ -150,38 +160,70 @@ export class ScoringEventStateService {
     return this.event?.pools.filter((pool) => this.canViewPool(pool)).map((pool) => buildPoolCard(pool)) ?? [];
   }
 
-  get allDivisionPoolGroups(): DivisionPoolGroup[] {
-    const groups = new Map<string, PoolCard[]>();
+  get allCategoryPoolGroups(): CategoryPoolGroup[] {
+    return this.categoryPoolGroupsFor(this.poolCards);
+  }
 
-    for (const card of this.poolCards) {
-      const division = normalizeDivision(card.pool.division);
-      groups.set(division, [...(groups.get(division) ?? []), card]);
+  get categoryPoolGroups(): CategoryPoolGroup[] {
+    return this.categoryPoolGroupsFor(this.visiblePoolCards);
+  }
+
+  get visibleCategoryPoolGroups(): CategoryPoolGroup[] {
+    const categoryGroups = this.categoryPoolGroups;
+
+    if (this.showingFavoritePools || !this.selectedCategory) {
+      return categoryGroups;
     }
 
-    return [...groups.entries()]
-      .sort(([left], [right]) => divisionSortIndex(left) - divisionSortIndex(right) || left.localeCompare(right))
-      .map(([division, cards]) => ({ division, cards }));
+    return categoryGroups
+      .filter((group) => group.category === this.selectedCategory)
+      .map((group) => ({
+        ...group,
+        divisions: this.selectedDivision
+          ? group.divisions.filter((divisionGroup) => divisionGroup.division === this.selectedDivision)
+          : group.divisions
+      }))
+      .filter((group) => group.divisions.length > 0);
+  }
+
+  get allDivisionPoolGroups(): DivisionPoolGroup[] {
+    return this.allCategoryPoolGroups.flatMap((group) => group.divisions);
   }
 
   get divisionPoolGroups(): DivisionPoolGroup[] {
-    const groups = new Map<string, PoolCard[]>();
-
-    for (const card of this.visiblePoolCards) {
-      const division = normalizeDivision(card.pool.division);
-      groups.set(division, [...(groups.get(division) ?? []), card]);
-    }
-
-    return [...groups.entries()]
-      .sort(([left], [right]) => divisionSortIndex(left) - divisionSortIndex(right) || left.localeCompare(right))
-      .map(([division, cards]) => ({ division, cards }));
+    return this.categoryPoolGroups.flatMap((group) => group.divisions);
   }
 
   get visibleDivisionPoolGroups(): DivisionPoolGroup[] {
-    if (this.showingFavoritePools || !this.selectedDivision) {
-      return this.divisionPoolGroups;
+    return this.visibleCategoryPoolGroups.flatMap((group) => group.divisions);
+  }
+
+  private categoryPoolGroupsFor(cards: PoolCard[]): CategoryPoolGroup[] {
+    const groups = new Map<string, Map<string, PoolCard[]>>();
+
+    for (const card of cards) {
+      const category = normalizePoolCategory(card.pool.category);
+      const division = normalizeDivision(card.pool.division);
+      const divisionGroups = groups.get(category) ?? new Map<string, PoolCard[]>();
+      divisionGroups.set(division, [...(divisionGroups.get(division) ?? []), card]);
+      groups.set(category, divisionGroups);
     }
 
-    return this.divisionPoolGroups.filter((group) => group.division === this.selectedDivision);
+    return [...groups.entries()]
+      .sort(
+        ([left], [right]) => poolCategorySortIndex(left) - poolCategorySortIndex(right) || left.localeCompare(right)
+      )
+      .map(([category, divisionMap]) => {
+        const divisions = [...divisionMap.entries()]
+          .sort(([left], [right]) => divisionSortIndex(left) - divisionSortIndex(right) || left.localeCompare(right))
+          .map(([division, divisionCards]) => ({ category, division, cards: divisionCards }));
+
+        return {
+          category,
+          divisions,
+          cards: divisions.flatMap((division) => division.cards)
+        };
+      });
   }
 
   get visiblePoolCards(): PoolCard[] {
@@ -198,14 +240,27 @@ export class ScoringEventStateService {
     return [...this.favoritePoolIds];
   }
 
-  poolCountForDivision(division: string): number {
-    return this.event?.pools.filter((pool) => pool.division === division).length ?? 0;
+  poolCountForDivision(category: string, division: string): number {
+    return (
+      this.event?.pools.filter(
+        (pool) => normalizePoolCategory(pool.category) === category && normalizeDivision(pool.division) === division
+      ).length ?? 0
+    );
   }
 
-  get divisionFilterOptions(): { division: string; count: number }[] {
-    return this.allDivisionPoolGroups.map((group) => ({
-      division: group.division,
-      count: group.cards.length
+  get divisionFilterOptions(): {
+    category: string;
+    cards: PoolCard[];
+    divisions: { category: string; division: string; count: number }[];
+  }[] {
+    return this.allCategoryPoolGroups.map((group) => ({
+      category: group.category,
+      cards: group.cards,
+      divisions: group.divisions.map((division) => ({
+        category: division.category,
+        division: division.division,
+        count: division.cards.length
+      }))
     }));
   }
 
@@ -372,6 +427,7 @@ export class ScoringEventStateService {
     this.draftPool = null;
     this.activePoolId = null;
     this.expandedMatchId = null;
+    this.selectedCategory = null;
     this.selectedDivision = null;
     this.showingFavoritePools = false;
     this.favoritePoolIds = new Set<string>();
@@ -389,9 +445,9 @@ export class ScoringEventStateService {
     this.draftPool = null;
     this.expandedMatchId = null;
     this.showingFavoritePools = false;
-    void this.router.navigate(['/events', this.event.code], {
-      queryParams: this.selectedDivision ? { division: this.selectedDivision } : undefined
-    });
+    this.selectedCategory = null;
+    this.selectedDivision = null;
+    void this.router.navigate(['/events', this.event.code]);
     this.bump();
   }
 
@@ -409,24 +465,32 @@ export class ScoringEventStateService {
     this.bump();
   }
 
-  selectDivision(division: string | null): void {
-    this.selectedDivision = division;
+  selectDivision(selection: { category: string; division: string | null } | null): void {
+    this.selectedCategory = selection ? normalizePoolCategory(selection.category) : null;
+    this.selectedDivision = selection?.division ? normalizeDivision(selection.division) : null;
     this.showingFavoritePools = false;
     this.draftPool = null;
     this.expandedMatchId = null;
 
     if (this.event) {
       void this.router.navigate(['/events', this.event.code], {
-        queryParams: division ? { division } : {}
+        queryParams: this.selectedCategory
+          ? { category: this.selectedCategory, ...(this.selectedDivision ? { division: this.selectedDivision } : {}) }
+          : {}
       });
     }
 
     this.bump();
   }
 
-  setSelectedDivisionFromRoute(division: string | null): void {
+  setSelectedDivisionFromRoute(category: string | null, division: string | null): void {
+    const normalizedCategory = category ? normalizePoolCategory(category) : null;
     const normalized = division ? normalizeDivision(division) : null;
+    this.selectedCategory = normalizedCategory && normalizedCategory === category ? normalizedCategory : null;
     this.selectedDivision = normalized && normalized === division ? normalized : null;
+    if (!this.selectedCategory) {
+      this.selectedDivision = null;
+    }
     this.bump();
   }
 
@@ -436,6 +500,7 @@ export class ScoringEventStateService {
     }
 
     this.showingFavoritePools = true;
+    this.selectedCategory = null;
     this.selectedDivision = null;
     this.draftPool = null;
     this.expandedMatchId = null;
@@ -449,6 +514,7 @@ export class ScoringEventStateService {
     this.showingFavoritePools = showingFavorites;
 
     if (showingFavorites) {
+      this.selectedCategory = null;
       this.selectedDivision = null;
     }
 
@@ -615,6 +681,7 @@ export class ScoringEventStateService {
 
   async createSeededPools(payload: {
     pools: PoolState[];
+    category: string;
     division: string;
     replaceDivisionPools: boolean;
   }): Promise<void> {
@@ -622,7 +689,13 @@ export class ScoringEventStateService {
       return;
     }
 
-    const selectedDivisionPools = this.event.pools.filter((pool) => pool.division === payload.division);
+    const selectedCategory = normalizePoolCategory(payload.category);
+    const selectedDivision = normalizeDivision(payload.division);
+    const selectedDivisionPools = this.event.pools.filter(
+      (pool) =>
+        normalizePoolCategory(pool.category) === selectedCategory &&
+        normalizeDivision(pool.division) === selectedDivision
+    );
     const overwritesScoredPools =
       payload.replaceDivisionPools && selectedDivisionPools.some((pool) => this.hasStartedScoring(pool));
     const confirmOverwriteScored =
@@ -636,7 +709,8 @@ export class ScoringEventStateService {
       method: 'PUT',
       headers: this.adminHeaders(),
       body: JSON.stringify({
-        division: payload.division,
+        division: selectedDivision,
+        category: selectedCategory,
         replaceDivisionPools: payload.replaceDivisionPools,
         confirmOverwriteScored,
         pools: payload.pools.map((pool) => this.poolWithoutImage(pool))
@@ -661,12 +735,19 @@ export class ScoringEventStateService {
     this.bump();
   }
 
-  async publishDivision(division: string): Promise<void> {
+  async publishDivision(selection: { category: string; division: string }): Promise<void> {
     if (!this.event || !this.isAdmin) {
       return;
     }
 
-    const poolsToPublish = this.event.pools.filter((pool) => pool.division === division && pool.hidden);
+    const selectedCategory = normalizePoolCategory(selection.category);
+    const selectedDivision = normalizeDivision(selection.division);
+    const poolsToPublish = this.event.pools.filter(
+      (pool) =>
+        normalizePoolCategory(pool.category) === selectedCategory &&
+        normalizeDivision(pool.division) === selectedDivision &&
+        pool.hidden
+    );
 
     if (poolsToPublish.length === 0) {
       return;
@@ -1350,6 +1431,7 @@ export class ScoringEventStateService {
     return {
       id: typeof pool.id === 'string' && pool.id.trim() ? pool.id : baseline.id,
       title: typeof pool.title === 'string' && pool.title.trim() ? pool.title : baseline.title,
+      category: normalizePoolCategory(pool.category),
       division: normalizeDivision(pool.division),
       hidden: Boolean(pool.hidden),
       editable: pool.editable !== false,

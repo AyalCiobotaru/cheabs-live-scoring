@@ -3,6 +3,7 @@ import vision from '@google-cloud/vision';
 
 const EVENT_TTL_SECONDS = 31 * 24 * 60 * 60;
 const DIVISION_OPTIONS = ['Open', 'AA', 'A/AA', 'A', 'BB', 'B/BB', 'B'];
+const POOL_CATEGORY_OPTIONS = ['Women', 'Men', 'Coed', 'RevCo'];
 const CSV_IMPORT_HEADERS = [
   'event_code',
   'event_name',
@@ -237,37 +238,47 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
       }
 
+      const category = normalizePoolCategory(payload.category);
       const division = normalizeDivision(payload.division);
       const incomingPools = Array.isArray(payload.pools)
-        ? payload.pools.map((pool) => sanitizePool({ ...pool, division })).filter(Boolean)
+        ? payload.pools.map((pool) => sanitizePool({ ...pool, category, division })).filter(Boolean)
         : [];
 
       if (incomingPools.length === 0) {
         throw httpError(400, 'At least one generated pool is required.', 'ERR_POOLS_REQUIRED');
       }
 
-      if (incomingPools.some((pool) => pool.division !== division)) {
-        throw httpError(400, 'Generated pools must use the selected division.', 'ERR_POOL_DIVISION');
+      if (incomingPools.some((pool) => pool.category !== category || pool.division !== division)) {
+        throw httpError(400, 'Generated pools must use the selected category and division.', 'ERR_POOL_DIVISION');
       }
 
       const replaceDivisionPools = Boolean(payload.replaceDivisionPools);
-      const existingDivisionPools = event.pools.filter((pool) => pool.division === division);
+      const existingDivisionPools = event.pools.filter(
+        (pool) => normalizePoolCategory(pool.category) === category && normalizeDivision(pool.division) === division
+      );
       const overwritesScoredPools = replaceDivisionPools && existingDivisionPools.some(hasStartedScoring);
 
       if (overwritesScoredPools && payload.confirmOverwriteScored !== true) {
         throw httpError(409, 'Replacing scored pools requires confirmation.', 'ERR_SCORED_POOLS_CONFIRMATION');
       }
 
-      const firstDivisionIndex = event.pools.findIndex((pool) => pool.division === division);
+      const firstDivisionIndex = event.pools.findIndex(
+        (pool) => normalizePoolCategory(pool.category) === category && normalizeDivision(pool.division) === division
+      );
       const lastDivisionIndex = event.pools.reduce(
-        (lastIndex, pool, index) => (pool.division === division ? index : lastIndex),
+        (lastIndex, pool, index) =>
+          normalizePoolCategory(pool.category) === category && normalizeDivision(pool.division) === division
+            ? index
+            : lastIndex,
         -1
       );
       let pools;
 
       if (replaceDivisionPools) {
         const insertIndex = firstDivisionIndex >= 0 ? firstDivisionIndex : event.pools.length;
-        pools = event.pools.filter((pool) => pool.division !== division);
+        pools = event.pools.filter(
+          (pool) => normalizePoolCategory(pool.category) !== category || normalizeDivision(pool.division) !== division
+        );
         pools.splice(insertIndex, 0, ...incomingPools);
       } else {
         const insertIndex = lastDivisionIndex >= 0 ? lastDivisionIndex + 1 : event.pools.length;
@@ -599,6 +610,11 @@ function normalizeDivision(value) {
   return DIVISION_OPTIONS.includes(division) ? division : DIVISION_OPTIONS[0];
 }
 
+function normalizePoolCategory(value) {
+  const category = typeof value === 'string' ? value.trim() : '';
+  return POOL_CATEGORY_OPTIONS.includes(category) ? category : 'Men';
+}
+
 function sanitizeEvent(event, code) {
   const pools = Array.isArray(event?.pools) ? event.pools.map(sanitizePool).filter(Boolean) : [];
   const activePoolId =
@@ -637,6 +653,7 @@ function sanitizePool(pool) {
   return {
     id,
     title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
+    category: normalizePoolCategory(pool.category),
     division: normalizeDivision(pool.division),
     hidden: Boolean(pool.hidden),
     editable: pool.editable !== false,
@@ -960,6 +977,7 @@ function buildImportedPool(pool, now, errors, warnings) {
   return {
     id: createId(),
     title: pool.settings.pool_title || 'Pool',
+    category: 'Men',
     division: pool.settings.division,
     teamCount,
     gamesPerMatch,
