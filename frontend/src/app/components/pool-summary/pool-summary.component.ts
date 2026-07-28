@@ -34,6 +34,12 @@ export class PoolSummaryComponent implements OnInit, OnDestroy {
     return this.pool.pointCap == null ? 'No Cap' : `cap ${this.pool.pointCap}`;
   }
 
+  courtSummary(): string {
+    const courtNumbers = this.pool.courtNumbers ?? [];
+
+    return courtNumbers.length ? `Court${courtNumbers.length === 1 ? '' : 's'} ${courtNumbers.join(', ')}` : '';
+  }
+
   timerStatus(): string {
     if (!this.pool.nextMatchStartAt) {
       return '';

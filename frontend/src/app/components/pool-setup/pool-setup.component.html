@@ -1,75 +1,77 @@
 <section class="setup-grid">
   @if (setupMode === 'manual') {
-  <div class="setup-panel camera-panel">
-    <h2>Pool Sheet</h2>
-    @if (isAdmin) {
-      <label class="camera-button">
-        <span>Take Pool Sheet photo</span>
-        <input type="file" accept="image/*" capture="environment" (change)="sheetCaptured.emit($event)" />
-      </label>
-      <button
-        type="button"
-        class="secondary"
-        (click)="sheetScanned.emit()"
-        [disabled]="!pool.imagePreview || scanStatus === 'scanning'"
-      >
-        {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
-      </button>
-    }
-    @if (scanStatus === 'scanning' && scanProgress) {
-      <p class="scan-progress">{{ scanProgress }}</p>
-    }
-    @if (scanStatus === 'success' && scanSummary) {
-      <section class="scan-summary">
-        <h3>Pool Sheet Read</h3>
-        @if (scanSummary.read.length) {
-          <div>
-            <strong>Read</strong>
-            <ul>
-              @for (item of scanSummary.read; track item) {
-                <li>{{ item }}</li>
-              }
-            </ul>
-          </div>
-        }
-        @if (scanSummary.assumed.length) {
-          <div>
-            <strong>Assumed</strong>
-            <ul>
-              @for (item of scanSummary.assumed; track item) {
-                <li>{{ item }}</li>
-              }
-            </ul>
-          </div>
-        }
-        @if (scanSummary.manual.length) {
-          <div>
-            <strong>Check</strong>
-            <ul>
-              @for (item of scanSummary.manual; track item) {
-                <li>{{ item }}</li>
-              }
-            </ul>
-          </div>
-        }
-      </section>
-    }
-    @if (scanError) {
-      <p class="scan-error">{{ scanError }}</p>
-    }
-    @if (pool.imagePreview) {
-      <img [src]="pool.imagePreview" alt="Captured Pool Sheet preview" />
-    } @else {
-      <div class="preview-placeholder">No photo captured</div>
-    }
-  </div>
+    <div class="setup-panel camera-panel">
+      <h2>Pool Sheet</h2>
+      @if (isAdmin) {
+        <label class="camera-button">
+          <span>Take Pool Sheet photo</span>
+          <input type="file" accept="image/*" capture="environment" (change)="sheetCaptured.emit($event)" />
+        </label>
+        <button
+          type="button"
+          class="secondary"
+          (click)="sheetScanned.emit()"
+          [disabled]="!pool.imagePreview || scanStatus === 'scanning'"
+        >
+          {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
+        </button>
+      }
+      @if (scanStatus === 'scanning' && scanProgress) {
+        <p class="scan-progress">{{ scanProgress }}</p>
+      }
+      @if (scanStatus === 'success' && scanSummary) {
+        <section class="scan-summary">
+          <h3>Pool Sheet Read</h3>
+          @if (scanSummary.read.length) {
+            <div>
+              <strong>Read</strong>
+              <ul>
+                @for (item of scanSummary.read; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (scanSummary.assumed.length) {
+            <div>
+              <strong>Assumed</strong>
+              <ul>
+                @for (item of scanSummary.assumed; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (scanSummary.manual.length) {
+            <div>
+              <strong>Check</strong>
+              <ul>
+                @for (item of scanSummary.manual; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+      }
+      @if (scanError) {
+        <p class="scan-error">{{ scanError }}</p>
+      }
+      @if (pool.imagePreview) {
+        <img [src]="pool.imagePreview" alt="Captured Pool Sheet preview" />
+      } @else {
+        <div class="preview-placeholder">No photo captured</div>
+      }
+    </div>
   }
 
   <div class="setup-panel" [class.seeded-setup-panel]="setupMode === 'seeded'">
     <h2>Pool Setup</h2>
     @if (isAdmin) {
       <div class="mode-toggle">
-        <button type="button" [class.active]="setupMode === 'manual'" (click)="setSetupMode('manual')">Manual pool</button>
+        <button type="button" [class.active]="setupMode === 'manual'" (click)="setSetupMode('manual')">
+          Manual pool
+        </button>
         <button
           type="button"
           [class.active]="setupMode === 'seeded'"
@@ -94,41 +96,68 @@
       </select>
     </label>
     @if (setupMode === 'manual') {
-    <label class="checkbox-row">
-      <input type="checkbox" [(ngModel)]="pool.hidden" [disabled]="!isAdmin" />
-      Hide pool
-    </label>
-    <div class="inline-fields">
-      <div class="pool-format-fields">
-        <label>
-          Teams
-          <select [value]="pool.teamCount" (change)="teamCountSelected($event)" [disabled]="!isAdmin">
-            @for (count of teamCountOptions; track count) {
-              <option [value]="count">{{ count }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Games per match
-          <input type="number" min="1" max="5" [(ngModel)]="pool.gamesPerMatch" [disabled]="!isAdmin" />
-        </label>
+      <label class="checkbox-row">
+        <input type="checkbox" [(ngModel)]="pool.hidden" [disabled]="!isAdmin" />
+        Hide pool
+      </label>
+      <div class="inline-fields">
+        <div class="pool-format-fields">
+          <label>
+            Teams
+            <select [value]="pool.teamCount" (change)="teamCountSelected($event)" [disabled]="!isAdmin">
+              @for (count of teamCountOptions; track count) {
+                <option [value]="count">{{ count }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Games per match
+            <input type="number" min="1" max="5" [(ngModel)]="pool.gamesPerMatch" [disabled]="!isAdmin" />
+          </label>
+        </div>
+        <div class="score-format-fields">
+          <label>
+            Target score
+            <input type="number" min="1" max="99" [(ngModel)]="pool.targetScore" [disabled]="!isAdmin" />
+          </label>
+          <label>
+            Cap
+            <input type="number" min="1" max="99" [(ngModel)]="pool.pointCap" [disabled]="!isAdmin" />
+          </label>
+          <label>
+            Minutes between matches
+            <input type="number" min="0" max="99" [(ngModel)]="pool.matchStartTimerMinutes" [disabled]="!isAdmin" />
+          </label>
+          <label>
+            Court numbers
+            <span class="schedule-tooltip-field">
+              <input
+                type="text"
+                [ngModel]="courtNumbersTextValue"
+                (ngModelChange)="courtNumbersChanged($event)"
+                placeholder="3-8 or 3,6,9"
+                [disabled]="!isAdmin"
+              />
+              <button
+                type="button"
+                class="info-tooltip-button"
+                aria-label="How to assign courts"
+                (click)="toggleTooltip($event, 'manual-courts')"
+                title="Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3 through 8."
+              >
+                i
+              </button>
+              @if (activeTooltipId === 'manual-courts') {
+                <span class="persistent-tooltip">
+                  Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3
+                  through 8.
+                </span>
+              }
+            </span>
+          </label>
+        </div>
+        <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
       </div>
-      <div class="score-format-fields">
-        <label>
-          Target score
-          <input type="number" min="1" max="99" [(ngModel)]="pool.targetScore" [disabled]="!isAdmin" />
-        </label>
-        <label>
-          Cap
-          <input type="number" min="1" max="99" [(ngModel)]="pool.pointCap" [disabled]="!isAdmin" />
-        </label>
-        <label>
-          Minutes between matches
-          <input type="number" min="0" max="99" [(ngModel)]="pool.matchStartTimerMinutes" [disabled]="!isAdmin" />
-        </label>
-      </div>
-      <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
-    </div>
     } @else {
       <div class="seeded-option-row">
         <label class="checkbox-row">
@@ -152,6 +181,32 @@
             (ngModelChange)="refreshSeededPreview()"
           />
           <span>Minutes between matches</span>
+        </label>
+        <label class="seeded-timer-field">
+          <input
+            type="text"
+            [ngModel]="courtNumbersTextValue"
+            (ngModelChange)="courtNumbersChanged($event)"
+            placeholder="3-8"
+          />
+          <span class="seeded-help-label">
+            Court numbers
+            <button
+              type="button"
+              class="info-tooltip-button"
+              aria-label="How to assign courts"
+              (click)="toggleTooltip($event, 'seeded-courts')"
+              title="Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3 through 8."
+            >
+              i
+            </button>
+            @if (activeTooltipId === 'seeded-courts') {
+              <span class="persistent-tooltip">
+                Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3
+                through 8.
+              </span>
+            }
+          </span>
         </label>
       </div>
       <div class="seeded-format-grid">
@@ -204,10 +259,14 @@
                   type="button"
                   class="info-tooltip-button"
                   aria-label="Preview schedule"
+                  (click)="toggleTooltip($event, 'primary-schedule-' + row.size)"
                   [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
                 >
                   i
                 </button>
+                @if (activeTooltipId === 'primary-schedule-' + row.size) {
+                  <span class="persistent-tooltip">{{ scheduleTooltip(row.size, row.format.schedulePresetId) }}</span>
+                }
               </span>
             </label>
           </section>
@@ -265,10 +324,14 @@
                     type="button"
                     class="info-tooltip-button"
                     aria-label="Preview schedule"
+                    (click)="toggleTooltip($event, 'advanced-schedule-' + row.size)"
                     [title]="scheduleTooltip(row.size, row.format.schedulePresetId)"
                   >
                     i
                   </button>
+                  @if (activeTooltipId === 'advanced-schedule-' + row.size) {
+                    <span class="persistent-tooltip">{{ scheduleTooltip(row.size, row.format.schedulePresetId) }}</span>
+                  }
                 </span>
               </label>
             </section>
@@ -320,10 +383,19 @@
           type="button"
           class="info-tooltip-button"
           aria-label="How seeded import creates pools"
+          (click)="toggleTooltip($event, 'seeded-import-preview')"
           title="Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If 5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest with 4-team pools when that count can be represented cleanly."
         >
           i
         </button>
+        @if (activeTooltipId === 'seeded-import-preview') {
+          <span class="persistent-tooltip">
+            Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread
+            across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If
+            5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest
+            with 4-team pools when that count can be represented cleanly.
+          </span>
+        }
       </div>
       @if (seededImportPreview) {
         @if (seededImportPreview.errors.length) {
@@ -358,7 +430,10 @@
                 </header>
                 <ol class="seeded-team-list">
                   @for (team of previewPool.teams; track team.seed) {
-                    <li><strong>{{ team.seed }}</strong><span>{{ team.name }}</span></li>
+                    <li>
+                      <strong>{{ team.seed }}</strong
+                      ><span>{{ team.name }}</span>
+                    </li>
                   }
                 </ol>
               </article>
@@ -370,100 +445,108 @@
       }
     </div>
   } @else {
-  <div class="setup-panel teams-panel">
-    <h2>Teams</h2>
-    @for (team of pool.teams; track team.seed) {
-      <label>
-        Seed {{ team.seed }}
-        <input [(ngModel)]="team.name" (ngModelChange)="saved.emit()" [disabled]="!isAdmin" />
-      </label>
-    }
-  </div>
-
-  <div class="setup-panel schedule-panel">
-    <div class="section-title">
-      <h2>Schedule</h2>
-      @if (isAdmin) {
-        <button type="button" (click)="matchAdded.emit()">Add match</button>
+    <div class="setup-panel teams-panel">
+      <h2>Teams</h2>
+      @for (team of pool.teams; track team.seed) {
+        <label>
+          Seed {{ team.seed }}
+          <input [(ngModel)]="team.name" (ngModelChange)="saved.emit()" [disabled]="!isAdmin" />
+        </label>
       }
     </div>
 
-    @if (isAdmin) {
-      <div class="schedule-preset-controls">
-        <label>
-          Saved schedule
-          <select
-            [ngModel]="selectedSchedulePresetId"
-            (ngModelChange)="schedulePresetSelected($event)"
-          >
-            <option value="">Choose schedule</option>
-            @for (preset of manualSchedulePresets; track preset.id) {
-              <option [ngValue]="preset.id">{{ preset.label }}</option>
-            }
-          </select>
-        </label>
-      </div>
-    }
-
-    @if (pool.matches.length) {
-      <div class="schedule-rows">
-        @for (match of pool.matches; track match.id; let index = $index; let first = $first; let last = $last) {
-          <div class="schedule-row">
-            <strong>{{ index + 1 }}</strong>
-            <label>
-              Work Team
-              <select [(ngModel)]="match.refSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
-                <option [ngValue]="null">None</option>
-                @for (team of pool.teams; track team.seed) {
-                  <option [ngValue]="team.seed">{{ team.seed }}</option>
-                }
-              </select>
-            </label>
-            <label>
-              Team A
-              <select [(ngModel)]="match.teamASeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
-                @for (team of pool.teams; track team.seed) {
-                  <option [ngValue]="team.seed">{{ team.seed }}</option>
-                }
-              </select>
-            </label>
-            <label>
-              Team B
-              <select [(ngModel)]="match.teamBSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
-                @for (team of pool.teams; track team.seed) {
-                  <option [ngValue]="team.seed">{{ team.seed }}</option>
-                }
-              </select>
-            </label>
-            @if (isAdmin) {
-              <div class="schedule-reorder-actions">
-                <button
-                  type="button"
-                  class="secondary icon-button"
-                  (click)="matchMoved.emit({ matchId: match.id, direction: -1 })"
-                  [disabled]="first"
-                  aria-label="Move match up"
-                >
-                  &uarr;
-                </button>
-                <button
-                  type="button"
-                  class="secondary icon-button"
-                  (click)="matchMoved.emit({ matchId: match.id, direction: 1 })"
-                  [disabled]="last"
-                  aria-label="Move match down"
-                >
-                  &darr;
-                </button>
-              </div>
-              <button type="button" class="danger" (click)="matchRemoved.emit(match.id)">Remove</button>
-            }
-          </div>
+    <div class="setup-panel schedule-panel">
+      <div class="section-title">
+        <h2>Schedule</h2>
+        @if (isAdmin) {
+          <button type="button" (click)="matchAdded.emit()">Add match</button>
         }
       </div>
-    } @else {
-      <p class="empty-copy">Add the match rows from the pool sheet in the same order they appear.</p>
-    }
-  </div>
+
+      @if (isAdmin) {
+        <div class="schedule-preset-controls">
+          <label>
+            Saved schedule
+            <select [ngModel]="selectedSchedulePresetId" (ngModelChange)="schedulePresetSelected($event)">
+              <option value="">Choose schedule</option>
+              @for (preset of manualSchedulePresets; track preset.id) {
+                <option [ngValue]="preset.id">{{ preset.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+      }
+
+      @if (pool.matches.length) {
+        <div class="schedule-rows">
+          @for (match of pool.matches; track match.id; let index = $index; let first = $first; let last = $last) {
+            <div class="schedule-row">
+              <strong>{{ index + 1 }}</strong>
+              <label>
+                Court
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  [(ngModel)]="match.courtNumber"
+                  (ngModelChange)="saved.emit()"
+                  [disabled]="!isAdmin"
+                />
+              </label>
+              <label>
+                Work Team
+                <select [(ngModel)]="match.refSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                  <option [ngValue]="null">None</option>
+                  @for (team of pool.teams; track team.seed) {
+                    <option [ngValue]="team.seed">{{ team.seed }}</option>
+                  }
+                </select>
+              </label>
+              <label>
+                Team A
+                <select [(ngModel)]="match.teamASeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                  @for (team of pool.teams; track team.seed) {
+                    <option [ngValue]="team.seed">{{ team.seed }}</option>
+                  }
+                </select>
+              </label>
+              <label>
+                Team B
+                <select [(ngModel)]="match.teamBSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
+                  @for (team of pool.teams; track team.seed) {
+                    <option [ngValue]="team.seed">{{ team.seed }}</option>
+                  }
+                </select>
+              </label>
+              @if (isAdmin) {
+                <div class="schedule-reorder-actions">
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    (click)="matchMoved.emit({ matchId: match.id, direction: -1 })"
+                    [disabled]="first"
+                    aria-label="Move match up"
+                  >
+                    &uarr;
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    (click)="matchMoved.emit({ matchId: match.id, direction: 1 })"
+                    [disabled]="last"
+                    aria-label="Move match down"
+                  >
+                    &darr;
+                  </button>
+                </div>
+                <button type="button" class="danger" (click)="matchRemoved.emit(match.id)">Remove</button>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="empty-copy">Add the match rows from the pool sheet in the same order they appear.</p>
+      }
+    </div>
   }
 </section>

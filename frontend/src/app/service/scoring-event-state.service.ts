@@ -24,6 +24,7 @@ import {
   createTemplateMatches,
   defaultTargetScore,
   defaultCap,
+  parseCourtNumbers,
   TEAM_COUNT_OPTIONS
 } from '../util/pool-setup-rules';
 import { SCHEDULE_PRESETS } from '../util/schedule-presets';
@@ -625,8 +626,7 @@ export class ScoringEventStateService {
     const overwritesScoredPools =
       payload.replaceDivisionPools && selectedDivisionPools.some((pool) => this.hasStartedScoring(pool));
     const confirmOverwriteScored =
-      !overwritesScoredPools ||
-      confirm('This will replace pools in this division that already have scores. Continue?');
+      !overwritesScoredPools || confirm('This will replace pools in this division that already have scores. Continue?');
 
     if (!confirmOverwriteScored) {
       return;
@@ -848,7 +848,7 @@ export class ScoringEventStateService {
       const seed = index + 1;
       return pool.teams.find((team) => team.seed === seed) ?? { seed, name: `Team ${seed}` };
     });
-    pool.matches = createTemplateMatches(count, pool.gamesPerMatch);
+    pool.matches = createTemplateMatches(count, pool.gamesPerMatch, pool.courtNumbers);
     pool.targetScore = defaultTargetScore(count);
     pool.pointCap = defaultCap(count);
     this.expandedMatchId = null;
@@ -883,6 +883,7 @@ export class ScoringEventStateService {
 
     const match: Match = {
       id: createId(),
+      courtNumber: pool.courtNumbers.length ? pool.courtNumbers[pool.matches.length % pool.courtNumbers.length] : null,
       refSeed: pool.teams[2]?.seed ?? null,
       teamASeed: pool.teams[0]?.seed ?? null,
       teamBSeed: pool.teams[1]?.seed ?? null,
@@ -903,11 +904,14 @@ export class ScoringEventStateService {
       return;
     }
 
-    if (this.hasStartedScoring(pool) && !confirm('Changing schedule will replace current matches and scores. Continue?')) {
+    if (
+      this.hasStartedScoring(pool) &&
+      !confirm('Changing schedule will replace current matches and scores. Continue?')
+    ) {
       return;
     }
 
-    pool.matches = createPresetMatches(preset.id, pool.gamesPerMatch);
+    pool.matches = createPresetMatches(preset.id, pool.gamesPerMatch, pool.courtNumbers);
     this.expandedMatchId = null;
     this.touchPool(pool);
     this.bump();
@@ -1306,9 +1310,11 @@ export class ScoringEventStateService {
     const baseline = createDefaultPool();
     const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
     const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
-    const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
+    const targetScore =
+      pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
     const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
     const matchStartTimerMinutes = clampWholeNumber(pool.matchStartTimerMinutes ?? 10, 0, 99);
+    const courtNumbers = Array.isArray(pool.courtNumbers) ? parseCourtNumbers(pool.courtNumbers.join(',')) : [];
     const nextMatchStartAt =
       matchStartTimerMinutes > 0 && typeof pool.nextMatchStartAt === 'string' ? pool.nextMatchStartAt : null;
     const nextMatchStartSourceMatchId =
@@ -1331,6 +1337,7 @@ export class ScoringEventStateService {
       targetScore,
       pointCap,
       matchStartTimerMinutes,
+      courtNumbers,
       nextMatchStartAt,
       nextMatchStartSourceMatchId,
       teams,
@@ -1421,6 +1428,7 @@ export class ScoringEventStateService {
     return {
       ...match,
       id: typeof match.id === 'string' && match.id.trim() ? match.id : createId(),
+      courtNumber: clampNullableWholeNumber(match.courtNumber, 1, 99),
       refSeed: seedOrNull(match.refSeed, teamCount),
       teamASeed: seedOrNull(match.teamASeed, teamCount),
       teamBSeed: seedOrNull(match.teamBSeed, teamCount),
@@ -1522,7 +1530,9 @@ export class ScoringEventStateService {
 
   private eventWithoutImages(event: EventState): EventState {
     const pools = this.isAdmin ? event.pools : event.pools.filter((pool) => !pool.hidden);
-    const activePoolId = pools.some((pool) => pool.id === event.activePoolId) ? event.activePoolId : (pools[0]?.id ?? null);
+    const activePoolId = pools.some((pool) => pool.id === event.activePoolId)
+      ? event.activePoolId
+      : (pools[0]?.id ?? null);
 
     return {
       ...event,
@@ -1664,4 +1674,10 @@ const parseStoredStringArray = (raw: string | null): string[] => {
   } catch {
     return [];
   }
+};
+
+const clampNullableWholeNumber = (value: unknown, min: number, max: number): number | null => {
+  const number = Number(value);
+
+  return Number.isInteger(number) && number >= min && number <= max ? number : null;
 };

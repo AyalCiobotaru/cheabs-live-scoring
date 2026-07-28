@@ -1,12 +1,20 @@
-import { ChangeDetectorRef, Component, EventEmitter, inject, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  HostListener,
+  inject,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { readSheet } from 'read-excel-file/browser';
 import { PoolState, ScanSummary, SeededImportFormats, SeededImportPreview } from '../../models';
+import { assignCourtNumbersToMatches, courtNumbersText, parseCourtNumbers } from '../../util/pool-setup-rules';
 import { SchedulePreset } from '../../util/schedule-presets';
-import {
-  DEFAULT_SEEDED_IMPORT_FORMATS,
-  buildSeededImportPreview
-} from '../../util/seeded-pool-import-rules';
+import { DEFAULT_SEEDED_IMPORT_FORMATS, buildSeededImportPreview } from '../../util/seeded-pool-import-rules';
 
 @Component({
   selector: 'app-pool-setup',
@@ -58,6 +66,8 @@ export class PoolSetupComponent implements OnChanges {
   seededImportReading = false;
   seededImportPreview: SeededImportPreview | null = null;
   seededFormats: SeededImportFormats = structuredClone(DEFAULT_SEEDED_IMPORT_FORMATS);
+  courtNumbersTextValue = '';
+  activeTooltipId = '';
 
   get seededFormatRows(): { size: 4 | 5 | 6 | 7; format: SeededImportFormats[4] }[] {
     return [
@@ -91,6 +101,10 @@ export class PoolSetupComponent implements OnChanges {
       this.setupMode = 'manual';
     }
 
+    if (changes['pool']) {
+      this.courtNumbersTextValue = this.courtNumbersInput();
+    }
+
     if (changes['pool'] || changes['existingDivisionPoolCount']) {
       this.refreshSeededPreview();
     }
@@ -102,6 +116,7 @@ export class PoolSetupComponent implements OnChanges {
     }
 
     this.setupMode = mode;
+    this.activeTooltipId = '';
     this.defaultSeededSchedulePresets();
     this.refreshSeededPreview();
   }
@@ -165,6 +180,7 @@ export class PoolSetupComponent implements OnChanges {
       this.seededFormats,
       this.replaceDivisionPools ? 1 : this.existingDivisionPoolCount + 1,
       this.pool.matchStartTimerMinutes,
+      this.pool.courtNumbers ?? [],
       this.pool.hidden,
       this.prioritizeFiveTeamPools
     );
@@ -187,9 +203,40 @@ export class PoolSetupComponent implements OnChanges {
   seededPoolSummary(pool: PoolState): string {
     return `${pool.teamCount} teams, ${pool.gamesPerMatch} game${pool.gamesPerMatch === 1 ? '' : 's'} to ${
       pool.targetScore
-    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}, ${
-      pool.hidden ? 'hidden' : 'visible'
-    }`;
+    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}, ${this.courtSummary(
+      pool
+    )}, ${pool.hidden ? 'hidden' : 'visible'}`;
+  }
+
+  courtNumbersInput(): string {
+    return courtNumbersText(this.pool.courtNumbers ?? []);
+  }
+
+  courtSummary(pool: PoolState): string {
+    const courtNumbers = pool.courtNumbers ?? [];
+
+    return courtNumbers.length
+      ? `court${courtNumbers.length === 1 ? '' : 's'} ${courtNumbers.join(', ')}`
+      : 'no courts';
+  }
+
+  courtNumbersChanged(value: string): void {
+    this.courtNumbersTextValue = value;
+    const courtNumbers = parseCourtNumbers(value);
+    this.pool.courtNumbers = courtNumbers;
+    this.pool.matches = assignCourtNumbersToMatches(this.pool.matches, courtNumbers);
+    this.saved.emit();
+    this.refreshSeededPreview();
+  }
+
+  toggleTooltip(event: Event, tooltipId: string): void {
+    event.stopPropagation();
+    this.activeTooltipId = this.activeTooltipId === tooltipId ? '' : tooltipId;
+  }
+
+  @HostListener('document:click')
+  closeTooltip(): void {
+    this.activeTooltipId = '';
   }
 
   seededTimerSummary(pool: PoolState): string {
@@ -210,8 +257,7 @@ export class PoolSetupComponent implements OnChanges {
 
   scheduleTooltip(size: number, presetId: string): string {
     const preset =
-      this.schedulePresets.find((candidate) => candidate.id === presetId) ??
-      this.schedulePresetsForSize(size)[0];
+      this.schedulePresets.find((candidate) => candidate.id === presetId) ?? this.schedulePresetsForSize(size)[0];
 
     if (!preset) {
       return 'No schedule preset is available for that pool size.';
@@ -240,8 +286,7 @@ const worksheetToSeededCsv = (rows: unknown[][]): string =>
     .map(([seed, teamName]) => [csvCell(seed), csvCell(teamName)].join(','))
     .join('\n');
 
-const csvCell = (value: string): string =>
-  /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+const csvCell = (value: string): string => (/[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
 
 const excelCellText = (value: unknown): string => {
   if (value == null) {
@@ -259,8 +304,7 @@ const isExcelFile = (file: File): boolean => {
   const fileName = file.name.toLowerCase();
 
   return (
-    fileName.endsWith('.xlsx') ||
-    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    fileName.endsWith('.xlsx') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );
 };
 

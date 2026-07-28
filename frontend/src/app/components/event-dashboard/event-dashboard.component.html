@@ -45,7 +45,7 @@
                 (keydown.space)="$event.preventDefault(); poolSelected.emit(card.pool.id)"
               >
                 <div class="pool-card-heading">
-                  <h4 class="pool-card-title">{{ card.pool.title }}</h4>
+                  <h4 class="pool-card-title">{{ card.pool.title }} - Court {{card.pool.courtNumbers}} </h4>
                   @if (isAdmin && card.pool.hidden) {
                     <span class="pool-hidden-badge">Hidden</span>
                   }

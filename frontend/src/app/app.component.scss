@@ -547,6 +547,13 @@ button:disabled {
   width: 70px;
 }
 
+.seeded-help-label {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  position: relative;
+}
+
 .seeded-format-grid,
 .seeded-preview-grid {
   display: grid;
@@ -588,6 +595,7 @@ button:disabled {
   display: grid;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr) 24px;
+  position: relative;
 }
 
 .seeded-preview-panel {
@@ -598,6 +606,7 @@ button:disabled {
   align-items: center;
   display: flex;
   gap: 8px;
+  position: relative;
 }
 
 .info-tooltip-button {
@@ -614,6 +623,7 @@ button:disabled {
   justify-content: center;
   line-height: 1;
   padding: 0;
+  position: relative;
   width: 24px;
 }
 
@@ -621,6 +631,23 @@ button:disabled {
 .info-tooltip-button:focus-visible {
   background: #dfe8f2;
   color: #143f6b;
+}
+
+.persistent-tooltip {
+  background: #17202b;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  left: calc(100% + 8px);
+  line-height: 1.35;
+  max-width: min(300px, 80vw);
+  padding: 8px 10px;
+  position: absolute;
+  top: 0;
+  white-space: pre-line;
+  width: max-content;
+  z-index: 20;
 }
 
 .seeded-setup-panel {

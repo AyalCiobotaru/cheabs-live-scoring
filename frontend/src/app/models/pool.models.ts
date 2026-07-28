@@ -11,6 +11,7 @@ export interface GameScore {
 
 export interface Match {
   id: string;
+  courtNumber: number | null;
   refSeed: number | null;
   teamASeed: number | null;
   teamBSeed: number | null;
@@ -29,6 +30,7 @@ export interface PoolState {
   targetScore: number;
   pointCap: number | null;
   matchStartTimerMinutes: number;
+  courtNumbers: number[];
   nextMatchStartAt: string | null;
   nextMatchStartSourceMatchId: string | null;
   teams: Team[];

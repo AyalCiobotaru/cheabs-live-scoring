@@ -619,9 +619,11 @@ function sanitizePool(pool) {
   const id = typeof pool.id === 'string' && pool.id.trim() ? pool.id.trim() : createId();
   const teamCount = clampWholeNumber(pool.teamCount, 3, 7);
   const gamesPerMatch = clampWholeNumber(pool.gamesPerMatch, 1, 5);
-  const targetScore = pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
+  const targetScore =
+    pool.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(pool.targetScore, 1, 99);
   const pointCap = pool.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(pool.pointCap, 1, 99));
   const matchStartTimerMinutes = clampWholeNumber(pool.matchStartTimerMinutes ?? 10, 0, 99);
+  const courtNumbers = parseCourtNumbers(pool.courtNumbers);
   const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
   const nextMatchStartAt =
     matchStartTimerMinutes > 0 && typeof pool.nextMatchStartAt === 'string' ? pool.nextMatchStartAt : null;
@@ -638,6 +640,7 @@ function sanitizePool(pool) {
     targetScore,
     pointCap,
     matchStartTimerMinutes,
+    courtNumbers,
     nextMatchStartAt,
     nextMatchStartSourceMatchId,
     teams: Array.from({ length: teamCount }, (_, index) => {
@@ -703,6 +706,7 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
 
   return {
     id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
+    courtNumber: nullableInteger(match?.courtNumber, 1, 99),
     refSeed: nullableInteger(match?.refSeed, 1, teamCount),
     teamASeed: nullableInteger(match?.teamASeed, 1, teamCount),
     teamBSeed: nullableInteger(match?.teamBSeed, 1, teamCount),
@@ -719,8 +723,7 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
 function hasStartedScoring(pool) {
   return (pool.matches ?? []).some(
     (match) =>
-      match.final ||
-      (match.games ?? []).some((game) => wholeNumber(game.scoreA) > 0 || wholeNumber(game.scoreB) > 0)
+      match.final || (match.games ?? []).some((game) => wholeNumber(game.scoreA) > 0 || wholeNumber(game.scoreB) > 0)
   );
 }
 
@@ -729,7 +732,9 @@ async function buildCsvImportEvent(payload) {
   const errors = [];
   const warnings = [];
   const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
-  const eventCodes = uniqueNonEmpty(rows.map((row) => row.values.event_code)).map((code) => normalizeImportCode(code, errors));
+  const eventCodes = uniqueNonEmpty(rows.map((row) => row.values.event_code)).map((code) =>
+    normalizeImportCode(code, errors)
+  );
   const eventNames = uniqueNonEmpty(rows.map((row) => row.values.event_name));
   const pools = new Map();
   const now = new Date().toISOString();
@@ -888,7 +893,10 @@ function buildImportedPool(pool, now, errors, warnings) {
   }
 
   if (pointCap != null && pointCap < targetScore) {
-    errors.push({ lineNumber: pool.firstLineNumber, message: '"point_cap" must be greater than or equal to target_score.' });
+    errors.push({
+      lineNumber: pool.firstLineNumber,
+      message: '"point_cap" must be greater than or equal to target_score.'
+    });
   }
 
   if (!pool.settings.games_per_match) {
@@ -931,11 +939,17 @@ function buildImportedPool(pool, now, errors, warnings) {
   }
 
   if (pool.teams.length > teamCount) {
-    errors.push({ lineNumber: pool.firstLineNumber, message: `More than ${teamCount} teams in pool_key "${pool.key}".` });
+    errors.push({
+      lineNumber: pool.firstLineNumber,
+      message: `More than ${teamCount} teams in pool_key "${pool.key}".`
+    });
   }
 
   if (pool.teams.length < teamCount) {
-    errors.push({ lineNumber: pool.firstLineNumber, message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".` });
+    errors.push({
+      lineNumber: pool.firstLineNumber,
+      message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".`
+    });
   }
 
   return {
@@ -946,9 +960,11 @@ function buildImportedPool(pool, now, errors, warnings) {
     gamesPerMatch,
     targetScore,
     pointCap,
-    teams: pool.teams
-      .map(({ seed, name }) => ({ seed, name }))
-      .sort((left, right) => left.seed - right.seed),
+    matchStartTimerMinutes: 10,
+    courtNumbers: [],
+    nextMatchStartAt: null,
+    nextMatchStartSourceMatchId: null,
+    teams: pool.teams.map(({ seed, name }) => ({ seed, name })).sort((left, right) => left.seed - right.seed),
     matches: createTemplateMatches(teamCount, gamesPerMatch, now),
     imagePreview: null,
     updatedAt: now
@@ -960,6 +976,7 @@ function createTemplateMatches(teamCount, gamesPerMatch, now) {
 
   return rows.map(([teamASeed, teamBSeed, refSeed]) => ({
     id: createId(),
+    courtNumber: null,
     refSeed,
     teamASeed,
     teamBSeed,
@@ -1033,10 +1050,7 @@ function isAdminRequest(request) {
 }
 
 function adminPasswords() {
-  return [
-    ...splitAdminPasswords(process.env.ADMIN_PASSWORD),
-    ...splitAdminPasswords(process.env.ADMIN_PASSWORDS)
-  ];
+  return [...splitAdminPasswords(process.env.ADMIN_PASSWORD), ...splitAdminPasswords(process.env.ADMIN_PASSWORDS)];
 }
 
 function splitAdminPasswords(value) {
@@ -1121,7 +1135,9 @@ function normalizeVisionWord(word) {
 }
 
 function groupWordsIntoLines(words) {
-  const sortedWords = [...words].sort((left, right) => lineCenter(left) - lineCenter(right) || left.bounds.x - right.bounds.x);
+  const sortedWords = [...words].sort(
+    (left, right) => lineCenter(left) - lineCenter(right) || left.bounds.x - right.bounds.x
+  );
   const groups = [];
 
   for (const word of sortedWords) {
@@ -1193,9 +1209,7 @@ function mergeBounds(boundsList) {
 }
 
 function averageConfidence(words) {
-  const confidences = words
-    .map((word) => word.confidence)
-    .filter((confidence) => typeof confidence === 'number');
+  const confidences = words.map((word) => word.confidence).filter((confidence) => typeof confidence === 'number');
 
   if (confidences.length === 0) {
     return null;
@@ -1209,7 +1223,8 @@ function googleVisionClient() {
     return visionClient;
   }
 
-  const credentialsJson = process.env.GOOGLE_CLOUD_VISION_CREDENTIALS_JSON ?? process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  const credentialsJson =
+    process.env.GOOGLE_CLOUD_VISION_CREDENTIALS_JSON ?? process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
   const options = {};
 
   if (credentialsJson) {
@@ -1251,6 +1266,26 @@ function defaultCap(teamCount) {
 function nullableInteger(value, min, max) {
   const number = Number(value);
   return Number.isInteger(number) && number >= min && number <= max ? number : null;
+}
+
+function parseCourtNumbers(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const courtNumbers = [];
+
+  for (const item of value) {
+    const number = Number(item);
+
+    if (Number.isInteger(number) && number >= 1 && number <= 99 && !seen.has(number)) {
+      seen.add(number);
+      courtNumbers.push(number);
+    }
+  }
+
+  return courtNumbers;
 }
 
 function wholeNumber(value) {

@@ -20,6 +20,7 @@ export const buildSeededImportPreview = (
   formats: SeededImportFormats,
   startingPoolNumber: number,
   matchStartTimerMinutes: number,
+  courtNumbers: number[],
   hidden: boolean,
   prioritizeFiveTeamPools = false
 ): SeededImportPreview => {
@@ -33,6 +34,7 @@ export const buildSeededImportPreview = (
           formats,
           startingPoolNumber,
           matchStartTimerMinutes,
+          courtNumbers,
           hidden,
           prioritizeFiveTeamPools
         )
@@ -52,6 +54,7 @@ export const buildSeededPools = (
   formats: SeededImportFormats,
   startingPoolNumber: number,
   matchStartTimerMinutes: number,
+  courtNumbers: number[],
   hidden: boolean,
   prioritizeFiveTeamPools = false
 ): PoolState[] => {
@@ -62,6 +65,7 @@ export const buildSeededPools = (
   return pools.map((seeds, index) => {
     const teamCount = seeds.length as 4 | 5 | 6 | 7;
     const format = normalizeFormat(formats[teamCount]);
+    const poolCourtNumbers = courtNumbers.length ? [courtNumbers[index % courtNumbers.length]] : [];
 
     return {
       id: createId(),
@@ -73,6 +77,7 @@ export const buildSeededPools = (
       targetScore: format.targetScore,
       pointCap: format.pointCap,
       matchStartTimerMinutes: normalizedMatchStartTimerMinutes,
+      courtNumbers: poolCourtNumbers,
       nextMatchStartAt: null,
       nextMatchStartSourceMatchId: null,
       teams: seeds.map((sourceSeed, teamIndex) => ({
@@ -80,8 +85,8 @@ export const buildSeededPools = (
         name: teamsBySeed.get(sourceSeed)?.name ?? `Team ${sourceSeed}`
       })),
       matches: format.schedulePresetId
-        ? createPresetMatches(format.schedulePresetId, format.gamesPerMatch)
-        : createTemplateMatches(teamCount, format.gamesPerMatch),
+        ? createPresetMatches(format.schedulePresetId, format.gamesPerMatch, poolCourtNumbers)
+        : createTemplateMatches(teamCount, format.gamesPerMatch, poolCourtNumbers),
       imagePreview: null,
       updatedAt: new Date().toISOString()
     };
@@ -97,7 +102,9 @@ const normalizeFormat = (format: {
   const gamesPerMatch = wholeNumber(format.gamesPerMatch, 1, 5, 2);
   const targetScore = wholeNumber(format.targetScore, 1, 99, 11);
   const pointCap =
-    format.pointCap === '' || format.pointCap == null ? null : Math.max(targetScore, wholeNumber(format.pointCap, 1, 99, targetScore));
+    format.pointCap === '' || format.pointCap == null
+      ? null
+      : Math.max(targetScore, wholeNumber(format.pointCap, 1, 99, targetScore));
   const schedulePresetId = typeof format.schedulePresetId === 'string' ? format.schedulePresetId : '';
 
   return { gamesPerMatch, targetScore, pointCap, schedulePresetId };
@@ -113,7 +120,11 @@ const parseSeededTeams = (
 ): { teams: ParsedSeededTeam[]; errors: SeededImportPreview['errors']; warnings: SeededImportPreview['warnings'] } => {
   const errors: SeededImportPreview['errors'] = [];
   const warnings: SeededImportPreview['warnings'] = [];
-  const lines = fileText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const lines = fileText
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n');
   const teams: ParsedSeededTeam[] = [];
   const seenSeeds = new Set<number>();
   const seenNames = new Set<string>();

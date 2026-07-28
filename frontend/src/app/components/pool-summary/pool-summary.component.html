@@ -9,6 +9,9 @@
       @if (timerStatus(); as status) {
         <p class="timer-status">{{ status }}</p>
       }
+      <!-- @if (courtSummary(); as courts) {
+        <p class="timer-status">{{ courts }}</p>
+      } -->
     </div>
     @if (showTimerButton()) {
       <button type="button" class="secondary timer-button" (click)="timerButtonClicked($event)">Timer</button>
