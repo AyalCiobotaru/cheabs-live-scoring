@@ -2,12 +2,25 @@
   <header class="pool-view-header">
     <div>
       <p>{{ eventName }}</p>
-      <h2>{{ pool.title }} - Court {{ pool.courtNumbers }}</h2>
+      <h2>
+        {{ pool.title }} - Court {{ pool.courtNumbers }}
+        @if (!canScore()) {
+          <span class="locked-pool-icon" title="Scoring is locked for this pool." aria-label="Scoring is closed"
+            >&#128274;</span
+          >
+        }
+      </h2>
     </div>
     <div class="header-actions">
       @if (isAdmin) {
         <button type="button" class="secondary" (click)="editSetup.emit()">Edit setup</button>
-        <button type="button" class="danger icon-button" aria-label="Delete pool" title="Delete pool" (click)="poolDeleted.emit()">
+        <button
+          type="button"
+          class="danger icon-button"
+          aria-label="Delete pool"
+          title="Delete pool"
+          (click)="poolDeleted.emit()"
+        >
           &times;
         </button>
       }
@@ -33,10 +46,11 @@
         [index]="index"
         [targetScore]="pool.targetScore"
         [pointCap]="pool.pointCap"
-        [expanded]="expandedMatchId === match.id"
+        [expanded]="canScore() && expandedMatchId === match.id"
         [first]="first"
         [last]="last"
         [canEditSetup]="isAdmin"
+        [canScore]="canScore()"
         (expandedChange)="expandedChange.emit({ matchId: match.id, expanded: $event })"
         (scoreChanged)="scoreChanged.emit({ match, game: $event })"
         (finalChanged)="finalChanged.emit(match)"

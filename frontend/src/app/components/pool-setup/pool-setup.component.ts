@@ -182,6 +182,7 @@ export class PoolSetupComponent implements OnChanges {
       this.pool.matchStartTimerMinutes,
       this.pool.courtNumbers ?? [],
       this.pool.hidden,
+      this.pool.editable ?? true,
       this.prioritizeFiveTeamPools
     );
   }
@@ -205,7 +206,7 @@ export class PoolSetupComponent implements OnChanges {
       pool.targetScore
     }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}, ${this.courtSummary(
       pool
-    )}, ${pool.hidden ? 'hidden' : 'visible'}`;
+    )}, ${pool.editable ? 'scoring open' : 'scoring locked'}, ${pool.hidden ? 'hidden' : 'visible'}`;
   }
 
   courtNumbersInput(): string {

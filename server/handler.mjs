@@ -368,6 +368,10 @@ export async function handleApiRequest(request, response) {
         throw httpError(404, 'Pool not found.', 'ERR_POOL_NOT_FOUND');
       }
 
+      if (pool.editable === false && !isAdminRequest(request)) {
+        throw httpError(403, 'Scoring is closed for this pool.', 'ERR_POOL_NOT_EDITABLE');
+      }
+
       const match = sanitizeMatch(
         {
           ...payload.match,
@@ -635,6 +639,7 @@ function sanitizePool(pool) {
     title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
     division: normalizeDivision(pool.division),
     hidden: Boolean(pool.hidden),
+    editable: pool.editable !== false,
     teamCount,
     gamesPerMatch,
     targetScore,
@@ -960,6 +965,7 @@ function buildImportedPool(pool, now, errors, warnings) {
     gamesPerMatch,
     targetScore,
     pointCap,
+    editable: true,
     matchStartTimerMinutes: 10,
     courtNumbers: [],
     nextMatchStartAt: null,

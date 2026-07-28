@@ -277,6 +277,19 @@ h4 {
   text-transform: uppercase;
 }
 
+.locked-pool-icon {
+  background: #fff8e8;
+  border: 1px solid #e1c582;
+  border-radius: 999px;
+  color: #6d4f08;
+  display: inline-flex;
+  font-size: 13px;
+  justify-content: center;
+  margin-left: 6px;
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+
 .favorite-toggle {
   align-items: center;
   color: #526071;

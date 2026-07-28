@@ -39,4 +39,8 @@ export class PoolViewComponent {
   @Output() finalChanged = new EventEmitter<Match>();
   @Output() moved = new EventEmitter<MatchMove>();
   @Output() removed = new EventEmitter<string>();
+
+  canScore(): boolean {
+    return this.isAdmin || this.pool.editable !== false;
+  }
 }

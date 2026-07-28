@@ -936,10 +936,10 @@ export class ScoringEventStateService {
     this.bump();
   }
 
-  handleScoreChanged(match: Match, game: GameScore): void {
+  async handleScoreChanged(match: Match, game: GameScore): Promise<void> {
     const pool = this.activePool;
 
-    if (!pool) {
+    if (!pool || !this.canScorePool(pool)) {
       return;
     }
 
@@ -947,6 +947,13 @@ export class ScoringEventStateService {
     this.showSideSwitchToastIfNeeded(pool, match, game);
     this.touchMatch(pool, match);
     this.persistLocal();
+    const persisted = await this.persistMatch(pool, match);
+
+    if (!persisted) {
+      this.bump();
+      return;
+    }
+
     if (!pool.hidden) {
       this.realtime.publishMatch(pool, match);
     }
@@ -956,7 +963,7 @@ export class ScoringEventStateService {
   async handleFinalChanged(match: Match): Promise<void> {
     const pool = this.activePool;
 
-    if (!pool) {
+    if (!pool || !this.canScorePool(pool)) {
       return;
     }
 
@@ -971,31 +978,40 @@ export class ScoringEventStateService {
 
     this.touchMatch(pool, match);
     this.persistLocal();
-    if (!pool.hidden) {
-      this.realtime.publishMatch(pool, match);
-    }
-    if (timerAction && !pool.hidden) {
-      this.realtime.publishPoolTimer(pool);
-    }
+    const persisted = await this.persistMatch(pool, match, timerAction);
 
-    await this.persistMatch(pool, match, timerAction);
+    if (persisted) {
+      if (!pool.hidden) {
+        this.realtime.publishMatch(pool, match);
+      }
+      if (timerAction && !pool.hidden) {
+        this.realtime.publishPoolTimer(pool);
+      }
+    }
 
     this.bump();
   }
 
-  setExpanded(matchId: string, expanded: boolean): void {
+  async setExpanded(matchId: string, expanded: boolean): Promise<void> {
     const pool = this.activePool;
     const match = pool?.matches.find((candidate) => candidate.id === matchId);
+
+    if (expanded && pool && !this.canScorePool(pool)) {
+      this.expandedMatchId = null;
+      this.bump();
+      return;
+    }
 
     this.expandedMatchId = expanded ? matchId : null;
 
     if (expanded && pool && match && this.clearPoolTimer(pool)) {
       this.touchPool(pool);
       this.persistLocal();
-      if (!pool.hidden) {
+      const persisted = await this.persistMatch(pool, match, 'clear');
+
+      if (persisted && !pool.hidden) {
         this.realtime.publishPoolTimer(pool);
       }
-      void this.persistMatch(pool, match, 'clear');
     }
 
     this.bump();
@@ -1097,9 +1113,9 @@ export class ScoringEventStateService {
     }
   }
 
-  private async persistMatch(pool: PoolState, match: Match, timerAction?: 'start' | 'clear'): Promise<void> {
+  private async persistMatch(pool: PoolState, match: Match, timerAction?: 'start' | 'clear'): Promise<boolean> {
     if (!this.event || this.applyingRemoteState) {
-      return;
+      return false;
     }
 
     this.event.updatedAt = new Date().toISOString();
@@ -1107,13 +1123,17 @@ export class ScoringEventStateService {
 
     const response = await fetch(`/api/scoring/events/${this.event.code}/pools/${pool.id}/matches/${match.id}`, {
       method: 'PUT',
-      headers: pool.hidden && this.isAdmin ? this.adminHeaders() : { 'content-type': 'application/json' },
+      headers:
+        this.isAdmin && (pool.hidden || !pool.editable) ? this.adminHeaders() : { 'content-type': 'application/json' },
       body: JSON.stringify({ match, timerAction })
     });
 
     if (!response.ok) {
       this.eventError = await this.errorMessage(response);
+      return false;
     }
+
+    return true;
   }
 
   private applyRemoteEvent(remote: EventState): void {
@@ -1332,6 +1352,7 @@ export class ScoringEventStateService {
       title: typeof pool.title === 'string' && pool.title.trim() ? pool.title : baseline.title,
       division: normalizeDivision(pool.division),
       hidden: Boolean(pool.hidden),
+      editable: pool.editable !== false,
       teamCount,
       gamesPerMatch,
       targetScore,
@@ -1553,6 +1574,10 @@ export class ScoringEventStateService {
 
   private canViewPool(pool: PoolState): boolean {
     return this.isAdmin || !pool.hidden;
+  }
+
+  private canScorePool(pool: PoolState): boolean {
+    return this.isAdmin || pool.editable !== false;
   }
 
   private clonePool(pool: PoolState): PoolState {

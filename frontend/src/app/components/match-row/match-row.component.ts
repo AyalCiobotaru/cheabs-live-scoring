@@ -20,6 +20,7 @@ export class MatchRowComponent {
   @Input() first = false;
   @Input() last = false;
   @Input() canEditSetup = false;
+  @Input() canScore = true;
 
   @Output() expandedChange = new EventEmitter<boolean>();
   @Output() scoreChanged = new EventEmitter<GameScore>();
@@ -37,11 +38,15 @@ export class MatchRowComponent {
   }
 
   toggleExpanded(): void {
+    if (!this.canScore) {
+      return;
+    }
+
     this.expandedChange.emit(!this.expanded);
   }
 
   updateScore(game: GameScore, side: 'A' | 'B', change: number): void {
-    if (this.match.final || game.final) {
+    if (!this.canScore || this.match.final || game.final) {
       return;
     }
 
@@ -55,7 +60,7 @@ export class MatchRowComponent {
   }
 
   setScore(game: GameScore, side: 'A' | 'B', value: unknown): void {
-    if (this.match.final || game.final) {
+    if (!this.canScore || this.match.final || game.final) {
       return;
     }
 
@@ -69,7 +74,7 @@ export class MatchRowComponent {
   }
 
   markGameFinal(game: GameScore): void {
-    if (!this.canMarkGameFinal(game)) {
+    if (!this.canScore || !this.canMarkGameFinal(game)) {
       return;
     }
 
@@ -78,7 +83,7 @@ export class MatchRowComponent {
   }
 
   reopenGame(game: GameScore): void {
-    if (this.match.final) {
+    if (!this.canScore || this.match.final) {
       return;
     }
 
@@ -105,7 +110,7 @@ export class MatchRowComponent {
   }
 
   markFinal(): void {
-    if (!this.canMarkFinal()) {
+    if (!this.canScore || !this.canMarkFinal()) {
       return;
     }
 
@@ -115,6 +120,10 @@ export class MatchRowComponent {
   }
 
   reopen(): void {
+    if (!this.canScore) {
+      return;
+    }
+
     this.match.final = false;
     this.expandedChange.emit(true);
     this.finalChanged.emit();

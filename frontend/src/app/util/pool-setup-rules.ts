@@ -11,6 +11,7 @@ export const createDefaultPool = (title = 'Pool'): PoolState => ({
   title,
   division: DIVISION_OPTIONS[0],
   hidden: true,
+  editable: true,
   teamCount: 4,
   gamesPerMatch: 2,
   targetScore: defaultTargetScore(4),
