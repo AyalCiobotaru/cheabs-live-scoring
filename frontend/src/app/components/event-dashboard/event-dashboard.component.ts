@@ -25,6 +25,7 @@ export class EventDashboardComponent {
   @Output() timerSelected = new EventEmitter<string>();
   @Output() poolDeleted = new EventEmitter<string>();
   @Output() divisionPublished = new EventEmitter<{ category: string; division: string }>();
+  @Output() divisionSeededEdited = new EventEmitter<{ category: string; division: string }>();
 
   isFavorite(poolId: string): boolean {
     return this.favoritePoolIds.includes(poolId);
@@ -32,5 +33,9 @@ export class EventDashboardComponent {
 
   hiddenPoolCount(group: DivisionPoolGroup): number {
     return group.cards.filter((card) => card.pool.hidden).length;
+  }
+
+  hasSeededPoolSource(group: DivisionPoolGroup): boolean {
+    return group.cards.some((card) => card.pool.seededPoolSource);
   }
 }

@@ -40,6 +40,10 @@ export class PoolSummaryComponent implements OnInit, OnDestroy {
     return courtNumbers.length ? `Court${courtNumbers.length === 1 ? '' : 's'} ${courtNumbers.join(', ')}` : '';
   }
 
+  truthSeedFor(seed: number): number | null {
+    return this.pool.teams.find((team) => team.seed === seed)?.seededSourceSeed ?? null;
+  }
+
   timerStatus(): string {
     if (!this.pool.nextMatchStartAt) {
       return '';

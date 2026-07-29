@@ -1,5 +1,11 @@
 import { PoolState, ScanSummary, SheetScanResult } from '../models';
-import { createScannedMatch, createTemplateMatches, defaultCap, defaultTargetScore } from '../util/pool-setup-rules';
+import {
+  assignCourtNumbersToMatches,
+  createScannedMatch,
+  createTemplateMatches,
+  defaultCap,
+  defaultTargetScore
+} from '../util/pool-setup-rules';
 import { normalizeDivision } from '../util/division-rules';
 import { clampWholeNumber, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 
@@ -25,9 +31,12 @@ export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, tit
         name: scannedTeams.get(seed) || pool.teams.find((team) => team.seed === seed)?.name || `Team ${seed}`
       };
     }),
-    matches: scan.matches.length
-      ? scan.matches.map((match) => createScannedMatch(match, teamCount, gamesPerMatch))
-      : createTemplateMatches(teamCount, gamesPerMatch)
+    matches: assignCourtNumbersToMatches(
+      scan.matches.length
+        ? scan.matches.map((match) => createScannedMatch(match, teamCount, gamesPerMatch))
+        : createTemplateMatches(teamCount, gamesPerMatch),
+      pool.courtNumbers
+    )
   };
 };
 

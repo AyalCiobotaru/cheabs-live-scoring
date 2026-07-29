@@ -25,3 +25,5 @@ After making edits:
 * Mention any files modified.
 * Mention any tests, builds, or checks run.
 * If you did not run tests, say so.
+
+When a markdown file is created and the logic has all been implemented, move the markdown file into the `completed` directory within .ai

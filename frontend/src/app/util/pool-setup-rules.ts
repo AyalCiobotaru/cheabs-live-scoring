@@ -23,6 +23,7 @@ export const createDefaultPool = (title = 'Pool'): PoolState => ({
   nextMatchStartSourceMatchId: null,
   teams: [1, 2, 3, 4].map((seed) => ({ seed, name: `Team ${seed}` })),
   matches: createTemplateMatches(4, 2),
+  seededPoolSource: null,
   imagePreview: null,
   updatedAt: new Date().toISOString()
 });

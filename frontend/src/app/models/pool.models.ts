@@ -1,6 +1,7 @@
 export interface Team {
   seed: number;
   name: string;
+  seededSourceSeed?: number | null;
 }
 
 export interface GameScore {
@@ -20,6 +21,33 @@ export interface Match {
   updatedAt: string | null;
 }
 
+export interface SeededPoolSourceTeam {
+  seed: number;
+  name: string;
+}
+
+export interface SeededPoolSourceFormat {
+  gamesPerMatch: number;
+  targetScore: number;
+  pointCap: number | null;
+  schedulePresetId: string;
+}
+
+export interface SeededPoolSource {
+  kind: 'seeded-import';
+  category: string;
+  division: string;
+  teams: SeededPoolSourceTeam[];
+  formats: Record<string, SeededPoolSourceFormat>;
+  prioritizeFiveTeamPools: boolean;
+  matchStartTimerMinutes: number;
+  courtNumbers: number[];
+  hidden: boolean;
+  editable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PoolState {
   id: string;
   title: string;
@@ -37,6 +65,7 @@ export interface PoolState {
   nextMatchStartSourceMatchId: string | null;
   teams: Team[];
   matches: Match[];
+  seededPoolSource: SeededPoolSource | null;
   imagePreview: string | null;
   updatedAt: string | null;
 }

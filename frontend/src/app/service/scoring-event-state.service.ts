@@ -11,6 +11,7 @@ import {
   Match,
   PoolCard,
   PoolTimerUpdate,
+  SeededPoolSource,
   PoolState,
   ScanSummary,
   SeededPoolsResponse,
@@ -585,6 +586,43 @@ export class ScoringEventStateService {
     }
 
     this.draftPool = createDefaultPool(this.nextPoolTitle());
+    this.activePoolId = null;
+    this.resetScanState();
+    void this.router.navigate(['/events', this.event.code, 'new-pool']);
+    this.bump();
+  }
+
+  editSeededDivision(selection: { category: string; division: string }): void {
+    if (!this.event || !this.isAdmin) {
+      return;
+    }
+
+    const selectedCategory = normalizePoolCategory(selection.category);
+    const selectedDivision = normalizeDivision(selection.division);
+    const sourcePool = this.event.pools.find(
+      (pool) =>
+        normalizePoolCategory(pool.category) === selectedCategory &&
+        normalizeDivision(pool.division) === selectedDivision &&
+        pool.seededPoolSource
+    );
+    const source = sourcePool?.seededPoolSource;
+
+    if (!source) {
+      this.eventError = 'No seeded source list is available for that category and division.';
+      this.bump();
+      return;
+    }
+
+    const draft = createDefaultPool(`${selectedCategory} ${selectedDivision}`);
+    draft.category = selectedCategory;
+    draft.division = selectedDivision;
+    draft.hidden = source.hidden;
+    draft.editable = source.editable;
+    draft.matchStartTimerMinutes = source.matchStartTimerMinutes;
+    draft.courtNumbers = [...source.courtNumbers];
+    draft.seededPoolSource = this.cloneSeededPoolSource(source);
+
+    this.draftPool = draft;
     this.activePoolId = null;
     this.resetScanState();
     void this.router.navigate(['/events', this.event.code, 'new-pool']);
@@ -1425,7 +1463,13 @@ export class ScoringEventStateService {
     const sourceTeams = Array.isArray(pool.teams) ? pool.teams : [];
     const teams = Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
-      return sourceTeams.find((team) => team.seed === seed) ?? { seed, name: `Team ${seed}` };
+      const team = sourceTeams.find((candidate) => candidate.seed === seed);
+
+      return {
+        seed,
+        name: typeof team?.name === 'string' && team.name.trim() ? team.name : `Team ${seed}`,
+        seededSourceSeed: this.seededSourceSeedOrNull(team?.seededSourceSeed)
+      };
     });
 
     return {
@@ -1447,9 +1491,72 @@ export class ScoringEventStateService {
       matches: Array.isArray(pool.matches)
         ? pool.matches.map((match) => this.normalizeMatch(match, gamesPerMatch, pointCap, teamCount))
         : [],
+      seededPoolSource: this.normalizeSeededPoolSource(pool.seededPoolSource),
       imagePreview: typeof pool.imagePreview === 'string' ? pool.imagePreview : null,
       updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : null
     };
+  }
+
+  private normalizeSeededPoolSource(source: SeededPoolSource | null | undefined): SeededPoolSource | null {
+    if (!source || source.kind !== 'seeded-import') {
+      return null;
+    }
+
+    const teams = Array.isArray(source.teams)
+      ? source.teams
+          .map((team) => ({
+            seed: clampWholeNumber(team.seed, 1, 999),
+            name: typeof team.name === 'string' ? team.name.trim() : ''
+          }))
+          .filter((team) => team.name)
+          .sort((left, right) => left.seed - right.seed)
+      : [];
+
+    if (!teams.length) {
+      return null;
+    }
+
+    const formats: SeededPoolSource['formats'] = {};
+
+    for (const size of ['4', '5', '6', '7']) {
+      const format = source.formats?.[size] ?? {
+        gamesPerMatch: 2,
+        targetScore: defaultTargetScore(Number(size)),
+        pointCap: defaultCap(Number(size)),
+        schedulePresetId: ''
+      };
+      const targetScore = clampWholeNumber(format.targetScore, 1, 99);
+
+      formats[size] = {
+        gamesPerMatch: clampWholeNumber(format.gamesPerMatch, 1, 5),
+        targetScore,
+        pointCap: format.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(format.pointCap, 1, 99)),
+        schedulePresetId: typeof format.schedulePresetId === 'string' ? format.schedulePresetId : ''
+      };
+    }
+
+    const now = new Date().toISOString();
+
+    return {
+      kind: 'seeded-import',
+      category: normalizePoolCategory(source.category),
+      division: normalizeDivision(source.division),
+      teams,
+      formats,
+      prioritizeFiveTeamPools: Boolean(source.prioritizeFiveTeamPools),
+      matchStartTimerMinutes: clampWholeNumber(source.matchStartTimerMinutes, 0, 99),
+      courtNumbers: Array.isArray(source.courtNumbers) ? parseCourtNumbers(source.courtNumbers.join(',')) : [],
+      hidden: Boolean(source.hidden),
+      editable: source.editable !== false,
+      createdAt: typeof source.createdAt === 'string' ? source.createdAt : now,
+      updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : now
+    };
+  }
+
+  private seededSourceSeedOrNull(value: unknown): number | null {
+    const number = Number(value);
+
+    return Number.isInteger(number) && number >= 1 && number <= 999 ? number : null;
   }
 
   private persistLocal(): void {
@@ -1664,6 +1771,10 @@ export class ScoringEventStateService {
 
   private clonePool(pool: PoolState): PoolState {
     return JSON.parse(JSON.stringify(pool)) as PoolState;
+  }
+
+  private cloneSeededPoolSource(source: SeededPoolSource): SeededPoolSource {
+    return JSON.parse(JSON.stringify(source)) as SeededPoolSource;
   }
 
   private hasStartedScoring(pool: PoolState): boolean {

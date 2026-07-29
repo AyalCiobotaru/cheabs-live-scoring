@@ -67,6 +67,23 @@ export const buildSeededPools = (
   const teamsBySeed = new Map(seededTeams.map((team) => [team.seed, team]));
   const pools = seedPoolsForCount(seededTeams.length, prioritizeFiveTeamPools);
   const normalizedMatchStartTimerMinutes = wholeNumber(matchStartTimerMinutes, 0, 99, 10);
+  const now = new Date().toISOString();
+  const seededPoolSource = {
+    kind: 'seeded-import' as const,
+    category,
+    division,
+    teams: seededTeams.map(({ seed, name }) => ({ seed, name })),
+    formats: Object.fromEntries(
+      ([4, 5, 6, 7] as const).map((size) => [String(size), normalizeFormat(formats[size])])
+    ),
+    prioritizeFiveTeamPools,
+    matchStartTimerMinutes: normalizedMatchStartTimerMinutes,
+    courtNumbers: [...courtNumbers],
+    hidden,
+    editable,
+    createdAt: now,
+    updatedAt: now
+  };
 
   return pools.map((seeds, index) => {
     const teamCount = seeds.length as 4 | 5 | 6 | 7;
@@ -90,13 +107,15 @@ export const buildSeededPools = (
       nextMatchStartSourceMatchId: null,
       teams: seeds.map((sourceSeed, teamIndex) => ({
         seed: teamIndex + 1,
-        name: teamsBySeed.get(sourceSeed)?.name ?? `Team ${sourceSeed}`
+        name: teamsBySeed.get(sourceSeed)?.name ?? `Team ${sourceSeed}`,
+        seededSourceSeed: sourceSeed
       })),
       matches: format.schedulePresetId
         ? createPresetMatches(format.schedulePresetId, format.gamesPerMatch, poolCourtNumbers)
         : createTemplateMatches(teamCount, format.gamesPerMatch, poolCourtNumbers),
+      seededPoolSource,
       imagePreview: null,
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     };
   });
 };

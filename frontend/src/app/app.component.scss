@@ -376,6 +376,7 @@ input,
 select {
   border: 1px solid #bcc8d6;
   border-radius: 4px;
+  box-sizing: border-box;
   font: inherit;
   min-height: 40px;
   padding: 9px 10px;
@@ -387,6 +388,7 @@ button,
   background: #143f6b;
   border: 1px solid #143f6b;
   border-radius: 4px;
+  box-sizing: border-box;
   color: #ffffff;
   cursor: pointer;
   font: inherit;
@@ -437,11 +439,28 @@ button:disabled {
   display: none;
 }
 
+.camera-panel {
+  align-content: start;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.camera-panel .camera-button,
+.camera-panel button {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
 .camera-panel img,
 .preview-placeholder {
   aspect-ratio: 4 / 3;
   border: 1px solid #d8e0ea;
   border-radius: 4px;
+  box-sizing: border-box;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   object-fit: cover;
   width: 100%;
 }
@@ -605,6 +624,65 @@ button:disabled {
 .seeded-format-panel h3 {
   color: #34465c;
   font-size: 14px;
+}
+
+.seeded-team-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.seeded-team-table {
+  border: 1px solid #d8e0ea;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.seeded-team-table-header,
+.seeded-team-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 52px minmax(160px, 1fr) 78px minmax(190px, auto);
+  padding: 8px;
+}
+
+.seeded-team-table-header {
+  background: #f3f6fa;
+  color: #34465c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.seeded-team-row {
+  border-top: 1px solid #e3e9f1;
+}
+
+.seeded-team-row strong {
+  background: #eef3f8;
+  border-radius: 4px;
+  color: #34465c;
+  font-size: 12px;
+  padding: 7px 5px;
+  text-align: center;
+}
+
+.seeded-team-row input {
+  min-width: 0;
+}
+
+.seeded-team-move-actions,
+.seeded-team-row-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.seeded-team-move-actions {
+  justify-content: center;
+}
+
+.seeded-team-row-actions {
+  justify-content: flex-end;
 }
 
 .advanced-seeded-settings {
@@ -821,6 +899,20 @@ app-match-row {
 
   .schedule-row {
     grid-template-columns: 1fr;
+  }
+
+  .seeded-team-table-header {
+    display: none;
+  }
+
+  .seeded-team-row {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .seeded-team-move-actions,
+  .seeded-team-row-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 
   .schedule-row strong {

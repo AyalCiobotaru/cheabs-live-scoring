@@ -16,6 +16,11 @@ import { assignCourtNumbersToMatches, courtNumbersText, parseCourtNumbers } from
 import { SchedulePreset } from '../../util/schedule-presets';
 import { DEFAULT_SEEDED_IMPORT_FORMATS, buildSeededImportPreview } from '../../util/seeded-pool-import-rules';
 
+interface SeededTeamRow {
+  id: string;
+  name: string;
+}
+
 @Component({
   selector: 'app-pool-setup',
   standalone: true,
@@ -66,10 +71,13 @@ export class PoolSetupComponent implements OnChanges {
   seededImportFileName = '';
   seededImportError = '';
   seededImportReading = false;
+  seededTeamRows: SeededTeamRow[] = [];
   seededImportPreview: SeededImportPreview | null = null;
   seededFormats: SeededImportFormats = structuredClone(DEFAULT_SEEDED_IMPORT_FORMATS);
   courtNumbersTextValue = '';
+  manualCourtError = '';
   activeTooltipId = '';
+  private initializedSeededSourceKey = '';
 
   get seededFormatRows(): { size: 4 | 5 | 6 | 7; format: SeededImportFormats[4] }[] {
     return [
@@ -105,6 +113,8 @@ export class PoolSetupComponent implements OnChanges {
 
     if (changes['pool']) {
       this.courtNumbersTextValue = this.courtNumbersInput();
+      this.validateManualCourtNumbers();
+      this.initializeSeededSourceUpdate();
     }
 
     if (changes['pool'] || changes['existingDivisionPoolCount']) {
@@ -120,6 +130,7 @@ export class PoolSetupComponent implements OnChanges {
     this.setupMode = mode;
     this.activeTooltipId = '';
     this.defaultSeededSchedulePresets();
+    this.validateManualCourtNumbers();
     this.refreshSeededPreview();
   }
 
@@ -141,6 +152,10 @@ export class PoolSetupComponent implements OnChanges {
     return this.manualSchedulePresets.some((preset) => preset.id === this.selectedSchedulePresetId);
   }
 
+  seededSourceUpdateMode(): boolean {
+    return this.setupMode === 'seeded' && Boolean(this.pool.seededPoolSource);
+  }
+
   async seededFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -149,6 +164,7 @@ export class PoolSetupComponent implements OnChanges {
     this.seededImportText = '';
     this.seededImportFileName = file?.name ?? '';
     this.seededImportReading = false;
+    this.seededTeamRows = [];
     this.seededImportPreview = null;
 
     if (!file) {
@@ -159,7 +175,14 @@ export class PoolSetupComponent implements OnChanges {
       this.seededImportReading = true;
       this.changeDetector.detectChanges();
       this.seededImportText = await readSeededTeamFile(file);
-      this.refreshSeededPreview();
+      const preview = this.seededPreviewForText(this.seededImportText);
+      this.seededTeamRows = this.seededRowsFromPreview(preview);
+
+      if (this.seededTeamRows.length) {
+        this.refreshSeededPreview();
+      } else {
+        this.seededImportPreview = preview;
+      }
     } catch (error) {
       this.seededImportError = error instanceof Error ? error.message : 'Unable to read that seeded team file.';
     } finally {
@@ -170,6 +193,7 @@ export class PoolSetupComponent implements OnChanges {
 
   refreshSeededPreview(): void {
     this.defaultSeededSchedulePresets();
+    this.syncSeededImportTextFromRows();
 
     if (!this.seededImportText.trim() || !this.pool) {
       this.seededImportPreview = null;
@@ -201,8 +225,47 @@ export class PoolSetupComponent implements OnChanges {
       pools: preview.pools,
       category: this.pool.category,
       division: this.pool.division,
-      replaceDivisionPools: this.replaceDivisionPools
+      replaceDivisionPools: this.replaceDivisionPools || Boolean(this.pool.seededPoolSource)
     });
+  }
+
+  seededSubmitLabel(): string {
+    return this.seededSourceUpdateMode() ? 'Update Pools' : 'Create Pools';
+  }
+
+  seededTeamRowsChanged(): void {
+    this.refreshSeededPreview();
+  }
+
+  addSeededTeam(): void {
+    this.seededTeamRows = [...this.seededTeamRows, this.createSeededTeamRow()];
+    this.refreshSeededPreview();
+  }
+
+  insertSeededTeamBelow(index: number): void {
+    const rows = [...this.seededTeamRows];
+    rows.splice(index + 1, 0, this.createSeededTeamRow());
+    this.seededTeamRows = rows;
+    this.refreshSeededPreview();
+  }
+
+  removeSeededTeam(index: number): void {
+    this.seededTeamRows = this.seededTeamRows.filter((_, rowIndex) => rowIndex !== index);
+    this.refreshSeededPreview();
+  }
+
+  moveSeededTeam(index: number, direction: -1 | 1): void {
+    const targetIndex = index + direction;
+
+    if (targetIndex < 0 || targetIndex >= this.seededTeamRows.length) {
+      return;
+    }
+
+    const rows = [...this.seededTeamRows];
+    const [row] = rows.splice(index, 1);
+    rows.splice(targetIndex, 0, row);
+    this.seededTeamRows = rows;
+    this.refreshSeededPreview();
   }
 
   seededPoolSummary(pool: PoolState): string {
@@ -228,6 +291,13 @@ export class PoolSetupComponent implements OnChanges {
   courtNumbersChanged(value: string): void {
     this.courtNumbersTextValue = value;
     const courtNumbers = parseCourtNumbers(value);
+
+    if (this.setupMode === 'manual' && courtNumbers.length !== 1) {
+      this.manualCourtError = 'Manual pools must use exactly one court.';
+      return;
+    }
+
+    this.manualCourtError = '';
     this.pool.courtNumbers = courtNumbers;
     this.pool.matches = assignCourtNumbersToMatches(this.pool.matches, courtNumbers);
     this.saved.emit();
@@ -258,6 +328,78 @@ export class PoolSetupComponent implements OnChanges {
         row.format.schedulePresetId = this.schedulePresetsForSize(row.size)[0]?.id ?? '';
       }
     }
+  }
+
+  private validateManualCourtNumbers(): void {
+    if (this.setupMode !== 'manual') {
+      this.manualCourtError = '';
+      return;
+    }
+
+    const courtNumbers = parseCourtNumbers(this.courtNumbersTextValue);
+    this.manualCourtError = courtNumbers.length === 1 ? '' : 'Manual pools must use exactly one court.';
+  }
+
+  private initializeSeededSourceUpdate(): void {
+    const source = this.pool?.seededPoolSource;
+    const sourceKey = source ? `${source.category}:${source.division}:${source.updatedAt}:${source.teams.length}` : '';
+
+    if (!source || this.initializedSeededSourceKey === sourceKey) {
+      return;
+    }
+
+    this.initializedSeededSourceKey = sourceKey;
+    this.setupMode = 'seeded';
+    this.replaceDivisionPools = true;
+    this.prioritizeFiveTeamPools = source.prioritizeFiveTeamPools;
+    this.seededTeamRows = source.teams
+      .slice()
+      .sort((left, right) => left.seed - right.seed)
+      .map((team) => this.createSeededTeamRow(team.name));
+    this.syncSeededImportTextFromRows();
+
+    for (const size of [4, 5, 6, 7] as const) {
+      const format = source.formats[String(size)];
+
+      if (format) {
+        this.seededFormats[size] = { ...format };
+      }
+    }
+  }
+
+  private syncSeededImportTextFromRows(): void {
+    this.seededImportText = this.seededTeamRows
+      .map((row, index) => `${index + 1},${csvCell(row.name)}`)
+      .join('\n');
+  }
+
+  private seededPreviewForText(fileText: string): SeededImportPreview {
+    return buildSeededImportPreview(
+      fileText,
+      this.pool.category,
+      this.pool.division,
+      this.seededFormats,
+      1,
+      this.pool.matchStartTimerMinutes,
+      this.pool.courtNumbers ?? [],
+      this.pool.hidden,
+      this.pool.editable ?? true,
+      this.prioritizeFiveTeamPools
+    );
+  }
+
+  private seededRowsFromPreview(preview: SeededImportPreview): SeededTeamRow[] {
+    return preview.teams
+      .slice()
+      .sort((left, right) => left.seed - right.seed)
+      .map((team) => this.createSeededTeamRow(team.name));
+  }
+
+  private createSeededTeamRow(name = ''): SeededTeamRow {
+    return {
+      id: createRowId(),
+      name
+    };
   }
 
   scheduleTooltip(size: number, presetId: string): string {
@@ -292,6 +434,8 @@ const worksheetToSeededCsv = (rows: unknown[][]): string =>
     .join('\n');
 
 const csvCell = (value: string): string => (/[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+
+const createRowId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const excelCellText = (value: unknown): string => {
   if (value == null) {

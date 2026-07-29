@@ -31,6 +31,7 @@ export class PoolViewComponent {
   @Input({ required: true }) expandedMatchId: string | null = null;
   @Input({ required: true }) isAdmin = false;
 
+  @Output() backSelected = new EventEmitter<void>();
   @Output() editSetup = new EventEmitter<void>();
   @Output() poolDeleted = new EventEmitter<void>();
   @Output() timerSelected = new EventEmitter<void>();

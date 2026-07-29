@@ -27,7 +27,12 @@
     </div>
     @for (standing of standings; track standing.seed) {
       <div class="summary-standing-row">
-        <span>{{ standing.name }}</span>
+        <span class="summary-team-name">
+          @if (truthSeedFor(standing.seed); as truthSeed) {
+            <span class="seeded-truth-seed" title="Original seeded import rank">{{ truthSeed }}</span>
+          }
+          <span>{{ standing.name }}</span>
+        </span>
         <span>{{ standing.wins }}</span>
         <span>{{ standing.losses }}</span>
         <span>{{ standing.pointDifferential }}</span>

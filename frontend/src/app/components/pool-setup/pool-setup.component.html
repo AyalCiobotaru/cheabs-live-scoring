@@ -89,7 +89,11 @@
     </label>
     <label>
       Category
-      <select [(ngModel)]="pool.category" (ngModelChange)="saved.emit(); refreshSeededPreview()" [disabled]="!isAdmin">
+      <select
+        [(ngModel)]="pool.category"
+        (ngModelChange)="saved.emit(); refreshSeededPreview()"
+        [disabled]="!isAdmin || seededSourceUpdateMode()"
+      >
         @for (category of categoryOptions; track category) {
           <option [ngValue]="category">{{ category }}</option>
         }
@@ -97,7 +101,11 @@
     </label>
     <label>
       Division
-      <select [(ngModel)]="pool.division" (ngModelChange)="saved.emit(); refreshSeededPreview()" [disabled]="!isAdmin">
+      <select
+        [(ngModel)]="pool.division"
+        (ngModelChange)="saved.emit(); refreshSeededPreview()"
+        [disabled]="!isAdmin || seededSourceUpdateMode()"
+      >
         @for (division of divisionOptions; track division) {
           <option [ngValue]="division">{{ division }}</option>
         }
@@ -141,32 +149,34 @@
             <input type="number" min="0" max="99" [(ngModel)]="pool.matchStartTimerMinutes" [disabled]="!isAdmin" />
           </label>
           <label>
-            Court numbers
+            Court number
             <span class="schedule-tooltip-field">
               <input
                 type="text"
                 [ngModel]="courtNumbersTextValue"
                 (ngModelChange)="courtNumbersChanged($event)"
-                placeholder="3-8 or 3,6,9"
+                placeholder="3"
                 [disabled]="!isAdmin"
               />
               <button
                 type="button"
                 class="info-tooltip-button"
-                aria-label="How to assign courts"
+                aria-label="How to assign a court"
                 (click)="toggleTooltip($event, 'manual-courts')"
-                title="Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3 through 8."
+                title="Manual pools use one court. Enter a single court number, like 3."
               >
                 i
               </button>
               @if (activeTooltipId === 'manual-courts') {
                 <span class="persistent-tooltip">
-                  Use commas for specific courts, like 3,6,9. Use a dash for an inclusive range, like 3-8 for courts 3
-                  through 8.
+                  Manual pools use one court. Enter a single court number, like 3.
                 </span>
               }
             </span>
           </label>
+          @if (manualCourtError) {
+            <p class="scan-error">{{ manualCourtError }}</p>
+          }
         </div>
         <button type="button" class="secondary" (click)="gameFormatApplied.emit()" [disabled]="!isAdmin">Apply</button>
       </div>
@@ -181,7 +191,12 @@
           Allow scoring
         </label>
         <label class="checkbox-row">
-          <input type="checkbox" [(ngModel)]="replaceDivisionPools" (ngModelChange)="refreshSeededPreview()" />
+          <input
+            type="checkbox"
+            [(ngModel)]="replaceDivisionPools"
+            (ngModelChange)="refreshSeededPreview()"
+            [disabled]="seededSourceUpdateMode()"
+          />
           Replace existing pools in this division
         </label>
         <label class="checkbox-row">
@@ -365,6 +380,61 @@
       @if (seededImportFileName) {
         <p class="match-summary">{{ seededImportFileName }}</p>
       }
+      <section class="seeded-team-editor">
+        <div class="section-title">
+          <h3>Seeded team list</h3>
+          <button type="button" class="secondary" (click)="addSeededTeam()">Add team</button>
+        </div>
+        @if (seededTeamRows.length) {
+          <div class="seeded-team-table">
+            <div class="seeded-team-table-header">
+              <span>Seed</span>
+              <span>Team</span>
+              <span>Move</span>
+              <span>Actions</span>
+            </div>
+            @for (row of seededTeamRows; track row.id; let index = $index; let first = $first; let last = $last) {
+              <div class="seeded-team-row">
+                <strong>{{ index + 1 }}</strong>
+                <input
+                  type="text"
+                  [(ngModel)]="row.name"
+                  (ngModelChange)="seededTeamRowsChanged()"
+                  [attr.aria-label]="'Seed ' + (index + 1) + ' team name'"
+                />
+                <div class="seeded-team-move-actions">
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    (click)="moveSeededTeam(index, -1)"
+                    [disabled]="first"
+                    aria-label="Move team up"
+                    title="Move team up"
+                  >
+                    &uarr;
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary icon-button"
+                    (click)="moveSeededTeam(index, 1)"
+                    [disabled]="last"
+                    aria-label="Move team down"
+                    title="Move team down"
+                  >
+                    &darr;
+                  </button>
+                </div>
+                <div class="seeded-team-row-actions">
+                  <button type="button" class="secondary" (click)="insertSeededTeamBelow(index)">Insert below</button>
+                  <button type="button" class="danger" (click)="removeSeededTeam(index)">&times;</button>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-copy">Upload a seeded team file or add teams manually.</p>
+        }
+      </section>
       @if (seededImportReading) {
         <p class="scan-progress">Reading seeded team file...</p>
       }
@@ -374,14 +444,14 @@
     }
     @if (isAdmin) {
       @if (setupMode === 'manual') {
-        <button type="button" (click)="poolSetupSaved.emit()">Save pool setup</button>
+        <button type="button" (click)="poolSetupSaved.emit()" [disabled]="manualCourtError">Save pool setup</button>
       } @else {
         <button
           type="button"
           (click)="createSeededPools()"
           [disabled]="seededImportReading || !seededImportPreview || seededImportPreview.errors.length > 0"
         >
-          Create Pools
+          {{ seededSubmitLabel() }}
         </button>
       }
       <button type="button" class="secondary" (click)="setupCanceled.emit()">Cancel</button>
@@ -447,7 +517,7 @@
                 <ol class="seeded-team-list">
                   @for (team of previewPool.teams; track team.seed) {
                     <li>
-                      <strong>{{ team.seed }}</strong
+                      <strong>{{ team.seededSourceSeed ?? team.seed }}</strong
                       ><span>{{ team.name }}</span>
                     </li>
                   }
@@ -499,17 +569,6 @@
             <div class="schedule-row">
               <strong>{{ index + 1 }}</strong>
               <label>
-                Court
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  [(ngModel)]="match.courtNumber"
-                  (ngModelChange)="saved.emit()"
-                  [disabled]="!isAdmin"
-                />
-              </label>
-              <label>
                 Work Team
                 <select [(ngModel)]="match.refSeed" (ngModelChange)="saved.emit()" [disabled]="!isAdmin">
                   <option [ngValue]="null">None</option>
@@ -555,7 +614,7 @@
                     &darr;
                   </button>
                 </div>
-                <button type="button" class="danger icon-button" (click)="matchRemoved.emit(match.id)">Remove</button>
+                <button type="button" class="danger icon-button" (click)="matchRemoved.emit(match.id)">&times;</button>
               }
             </div>
           }

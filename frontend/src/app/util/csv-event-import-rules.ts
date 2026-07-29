@@ -287,7 +287,8 @@ const buildPreview = (fileName: string, parsed: ParsedCsv): CsvImportPreview => 
       teams: pool.teams
         .map(({ seed, name, lineNumber }) => ({ seed, name, lineNumber }))
         .sort((left, right) => left.seed - right.seed),
-      matches: createTemplateMatches(teamCount, gamesPerMatch)
+      matches: createTemplateMatches(teamCount, gamesPerMatch),
+      seededPoolSource: null
     };
   });
 

@@ -650,6 +650,8 @@ function sanitizePool(pool) {
   const nextMatchStartSourceMatchId =
     nextMatchStartAt && typeof pool.nextMatchStartSourceMatchId === 'string' ? pool.nextMatchStartSourceMatchId : null;
 
+  const seededPoolSource = sanitizeSeededPoolSource(pool.seededPoolSource);
+
   return {
     id,
     title: typeof pool.title === 'string' && pool.title.trim() ? pool.title.trim() : 'Pool',
@@ -671,15 +673,77 @@ function sanitizePool(pool) {
 
       return {
         seed,
-        name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${seed}`
+        name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${seed}`,
+        seededSourceSeed: seededSourceSeedOrNull(team?.seededSourceSeed)
       };
     }),
     matches: Array.isArray(pool.matches)
       ? pool.matches.map((match) => sanitizeMatch(match, gamesPerMatch, pointCap, teamCount))
       : [],
+    seededPoolSource,
     imagePreview: null,
     updatedAt: typeof pool.updatedAt === 'string' ? pool.updatedAt : new Date().toISOString()
   };
+}
+
+function sanitizeSeededPoolSource(source) {
+  if (!source || source.kind !== 'seeded-import') {
+    return null;
+  }
+
+  const teams = Array.isArray(source.teams)
+    ? source.teams
+        .map((team) => {
+          const seed = clampWholeNumber(team?.seed, 1, 999);
+          const name = typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : '';
+
+          return name ? { seed, name } : null;
+        })
+        .filter(Boolean)
+        .sort((left, right) => left.seed - right.seed)
+    : [];
+
+  if (teams.length === 0) {
+    return null;
+  }
+
+  const formats = {};
+  const sourceFormats = source.formats && typeof source.formats === 'object' ? source.formats : {};
+
+  for (const size of ['4', '5', '6', '7']) {
+    const format = sourceFormats[size] ?? {};
+    const targetScore = clampWholeNumber(format.targetScore, 1, 99);
+    const pointCap = format.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(format.pointCap, 1, 99));
+
+    formats[size] = {
+      gamesPerMatch: clampWholeNumber(format.gamesPerMatch, 1, 5),
+      targetScore,
+      pointCap,
+      schedulePresetId: typeof format.schedulePresetId === 'string' ? format.schedulePresetId.trim() : ''
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  return {
+    kind: 'seeded-import',
+    category: normalizePoolCategory(source.category),
+    division: normalizeDivision(source.division),
+    teams,
+    formats,
+    prioritizeFiveTeamPools: Boolean(source.prioritizeFiveTeamPools),
+    matchStartTimerMinutes: clampWholeNumber(source.matchStartTimerMinutes ?? 10, 0, 99),
+    courtNumbers: parseCourtNumbers(source.courtNumbers),
+    hidden: Boolean(source.hidden),
+    editable: source.editable !== false,
+    createdAt: typeof source.createdAt === 'string' ? source.createdAt : now,
+    updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : now
+  };
+}
+
+function seededSourceSeedOrNull(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 1 && number <= 999 ? number : null;
 }
 
 function applyMatchTimerAction(pool, match, timerAction) {
@@ -990,6 +1054,7 @@ function buildImportedPool(pool, now, errors, warnings) {
     nextMatchStartSourceMatchId: null,
     teams: pool.teams.map(({ seed, name }) => ({ seed, name })).sort((left, right) => left.seed - right.seed),
     matches: createTemplateMatches(teamCount, gamesPerMatch, now),
+    seededPoolSource: null,
     imagePreview: null,
     updatedAt: now
   };

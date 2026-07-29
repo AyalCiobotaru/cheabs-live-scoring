@@ -34,6 +34,18 @@
                 <summary>
                   <span>{{ group.division }}</span>
                   <span>{{ group.cards.length }} pool{{ group.cards.length === 1 ? '' : 's' }}</span>
+                  @if (isAdmin && hasSeededPoolSource(group)) {
+                    <button
+                      type="button"
+                      class="secondary"
+                      (click)="
+                        $event.preventDefault();
+                        divisionSeededEdited.emit({ category: group.category, division: group.division })
+                      "
+                    >
+                      Edit seeded list
+                    </button>
+                  }
                   @if (isAdmin && hiddenPoolCount(group) > 0) {
                     <button
                       type="button"

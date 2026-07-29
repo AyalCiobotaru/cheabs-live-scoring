@@ -6,6 +6,7 @@
     [activePoolCard]="scoring.activePoolCard"
     [expandedMatchId]="scoring.expandedMatchId"
     [isAdmin]="scoring.isAdmin"
+    (backSelected)="scoring.openDashboard()"
     (editSetup)="scoring.editPoolSetup()"
     (poolDeleted)="scoring.deleteActivePool()"
     (timerSelected)="scoring.openPoolTimer(pool.id)"
