@@ -1,6 +1,13 @@
 import { Injectable } from '@angular/core';
 import { SheetScanBounds, SheetScanMatch, SheetScanOcrLine, SheetScanResult, SheetScanTeam } from '../models';
-import { DIVISION_OPTIONS, normalizeDivision } from '../util/division-rules';
+import { normalizeOcrLines, normalizePoolSheetScan } from '../util/sheet-scan-normalizers';
+import {
+  detectPoolSheetDivision,
+  detectPoolSheetGameFormat,
+  detectPoolSheetTeamCount,
+  detectPoolSheetTeamSeeds,
+  detectPoolSheetTitle
+} from '../util/sheet-scan-text-parser';
 
 export interface SheetScanProgress {
   status: string;
@@ -44,19 +51,19 @@ export class SheetScannerService {
 
     onProgress?.({ status: 'Parsing Google Vision text...', progress: 0.8 });
     const body = (await response.json()) as OcrResponse;
-    return this.normalizePoolSheetScan(this.parsePoolSheetOcr(body));
+    return normalizePoolSheetScan(this.parsePoolSheetOcr(body));
   }
 
   private parsePoolSheetOcr(ocr: OcrResponse): SheetScanResult {
-    const ocrLines = this.normalizeOcrLines(ocr.lines);
+    const ocrLines = normalizeOcrLines(ocr.lines);
     const sourceText = ocr.text ?? ocrLines.map((line) => line.text).join('\n');
     const lines = sourceText
       .split(/\r?\n/)
       .map((line) => line.replace(/\s+/g, ' ').trim())
       .filter(Boolean);
     const joined = lines.join('\n');
-    const teamCount = this.detectTeamCount(joined) ?? (this.detectTeamSeeds(lines).length || null);
-    const gameFormat = this.detectGameFormat(joined);
+    const teamCount = detectPoolSheetTeamCount(joined) ?? (detectPoolSheetTeamSeeds(lines).length || null);
+    const gameFormat = detectPoolSheetGameFormat(joined);
     const teamTable = this.extractTeamTable(lines, teamCount);
     const teams = this.detectTeamsFromOcrLines(ocrLines, teamCount) ?? this.detectTeams(lines, teamCount, teamTable);
     const notes = [
@@ -65,8 +72,8 @@ export class SheetScannerService {
     ];
 
     return {
-      title: this.detectTitle(lines, teamCount),
-      division: this.detectDivision(lines),
+      title: detectPoolSheetTitle(lines, teamCount),
+      division: detectPoolSheetDivision(lines),
       teamCount,
       gamesPerMatch: gameFormat.gamesPerMatch,
       targetScore: gameFormat.targetScore,
@@ -75,135 +82,6 @@ export class SheetScannerService {
       ocrLines,
       notes
     };
-  }
-
-  private detectTitle(lines: string[], teamCount: number | null): string | null {
-    const teamFormatLine = lines.find((line) => /\b[3-7]\s*[-\s]*teams?\b/i.test(line));
-
-    if (teamFormatLine) {
-      return teamFormatLine;
-    }
-
-    const poolLine = lines.find((line) => /\bpool\b/i.test(line) && !/\bteam\b/i.test(line));
-
-    if (poolLine) {
-      return poolLine;
-    }
-
-    return teamCount ? `${teamCount} Team Pool` : null;
-  }
-
-  private detectDivision(lines: string[]): string | null {
-    const divisionLine = lines.find((line) => /\bdivision\b/i.test(line));
-    const match = divisionLine?.match(/\bdivision\s*:\s*(.+)$/i);
-    const rawDivision = match?.[1]?.replace(/\b(?:women'?s|men'?s|coed)\b/gi, '').trim();
-    const division = DIVISION_OPTIONS.find((option) => option.toLowerCase() === rawDivision?.toLowerCase());
-
-    return division ?? null;
-  }
-
-  private detectTeamCount(text: string): number | null {
-    const match = text.match(/\b(three|four|five|six|seven|[3-7])[\s-]+teams?(?:[\s-]+(?:pool|net))?\b/i);
-
-    if (match) {
-      return Number(match[1]) || this.numberWord(match[1]);
-    }
-
-    const compactMatch = text.match(/\b([3-7])\s*team\s*(?:net|pool)?\b/i);
-    return compactMatch ? Number(compactMatch[1]) : null;
-  }
-
-  private detectGameFormat(text: string): { gamesPerMatch: number | null; targetScore: number | null } {
-    const lines = this.normalizePoolSheetText(text).split(/\r?\n/).filter(Boolean);
-    const shorthandMatch = this.extractHandwrittenGameFormat(lines.join('\n'));
-    const poolFormatLine = lines.find(
-      (line) => /\b(?:competition|round robin|pool play)\b/i.test(line) && !/\bplayoffs?\b/i.test(line)
-    );
-    const match =
-      shorthandMatch ??
-      this.extractGameFormat(poolFormatLine) ??
-      this.extractGameFormat(lines.filter((line) => !/\bplayoffs?\b/i.test(line)).join('\n'));
-    const inferredFormat = match ? null : this.inferTemplateGameFormat(text);
-
-    return {
-      gamesPerMatch: match ? Number(match[1]) : inferredFormat?.gamesPerMatch ?? null,
-      targetScore: match ? Number(match[2]) : inferredFormat?.targetScore ?? null
-    };
-  }
-
-  private normalizePoolSheetText(text: string): string {
-    return text
-      .replace(/\b(one|two|three|four|five)\b/gi, (word) => String(this.numberWord(word)))
-      .replace(/\b(games?|sets?)\s*of\b/gi, '$1 of')
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\s+/g, ' ').trim())
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  private extractGameFormat(text = ''): RegExpMatchArray | null {
-    return (
-      text.match(
-        /\b([1-5])\s*(?:games?|sets?|set)\s*(?:during pool play\s*)?(?:is|are)?\s*(?:to|of|using|x)\s*([0-9]{1,2})\b/i
-      ) ?? text.match(/\b([1-5])\s*(?:games?|sets?|set)\s*(?:to|of|x)\s*([0-9]{1,2})\b/i)
-    );
-  }
-
-  private extractHandwrittenGameFormat(text = ''): RegExpMatchArray | null {
-    const normalized = text
-      .replace(/\btwo\b/gi, '2')
-      .replace(/\b(?:too|t0|t\s+o)\b/gi, 'to')
-      .replace(/(?<=\d)\s*[|/\\-]\s*(?=\d)/g, ' to ');
-    const match = normalized.match(/\b2\s*(?:to|x)\s*(11|1\s*1|ll|l1|i1|ii|15|1\s*5|l5|i5|is|1s)\b/i);
-
-    if (!match) {
-      return null;
-    }
-
-    const targetScore = this.normalizeHandwrittenTargetScore(match[1]);
-    return targetScore ? ([match[0], '2', String(targetScore)] as unknown as RegExpMatchArray) : null;
-  }
-
-  private normalizeHandwrittenTargetScore(value: string): number | null {
-    const token = value.replace(/\s+/g, '').toLowerCase();
-
-    if (['11', 'll', 'l1', 'i1', 'ii'].includes(token)) {
-      return 11;
-    }
-
-    if (['15', 'l5', 'i5', 'is', '1s'].includes(token)) {
-      return 15;
-    }
-
-    return null;
-  }
-
-  private inferTemplateGameFormat(text: string): { gamesPerMatch: number; targetScore: number } | null {
-    const normalized = text.toLowerCase();
-
-    if (/\b2\s*(?:games?|sets?)\b/.test(normalized) && /\b15\b/.test(normalized)) {
-      return { gamesPerMatch: 2, targetScore: 15 };
-    }
-
-    if (/\b2\s*(?:games?|sets?)\b/.test(normalized) && /\b11\b/.test(normalized)) {
-      return { gamesPerMatch: 2, targetScore: 11 };
-    }
-
-    return null;
-  }
-
-  private detectTeamSeeds(lines: string[]): number[] {
-    const seeds = new Set<number>();
-
-    for (const line of lines) {
-      const match = line.match(/^([1-7])(?:\s+|$)/);
-
-      if (match) {
-        seeds.add(Number(match[1]));
-      }
-    }
-
-    return [...seeds].sort((a, b) => a - b);
   }
 
   private detectTeams(
@@ -721,85 +599,9 @@ export class SheetScannerService {
     return cleaned && !/^[|_\-.]+$/.test(cleaned) ? cleaned : null;
   }
 
-  private numberWord(value: string): number | null {
-    return (
-      {
-        one: 1,
-        two: 2,
-        three: 3,
-        four: 4,
-        five: 5,
-        six: 6,
-        seven: 7
-      }[value.toLowerCase()] ?? null
-    );
-  }
-
-  private normalizePoolSheetScan(scan: SheetScanResult): SheetScanResult {
-    const teamCount = this.nullableInteger(scan.teamCount, 3, 7);
-    const teams = Array.isArray(scan.teams)
-      ? scan.teams
-          .map((team) => ({
-            seed: this.nullableInteger(team.seed, 1, 7),
-            name: typeof team.name === 'string' && team.name.trim() ? team.name.trim() : null
-          }))
-          .filter((team): team is SheetScanTeam => team.seed != null)
-      : [];
-    const matches = Array.isArray(scan.matches)
-      ? scan.matches.map((match) => ({
-          refSeed: this.nullableInteger(match.refSeed, 1, 7),
-          teamASeed: this.nullableInteger(match.teamASeed, 1, 7),
-          teamBSeed: this.nullableInteger(match.teamBSeed, 1, 7)
-        }))
-      : [];
-    const notes = Array.isArray(scan.notes)
-      ? scan.notes.filter((note) => typeof note === 'string' && note.trim()).map((note) => note.trim())
-      : [];
-
-    return {
-      title: typeof scan.title === 'string' && scan.title.trim() ? scan.title.trim() : null,
-      division: typeof scan.division === 'string' && scan.division.trim() ? normalizeDivision(scan.division) : null,
-      teamCount,
-      gamesPerMatch: this.nullableInteger(scan.gamesPerMatch, 1, 5),
-      targetScore: this.nullableInteger(scan.targetScore, 1, 99),
-      teams,
-      matches,
-      ocrLines: this.normalizeOcrLines(scan.ocrLines),
-      notes
-    };
-  }
-
-  private nullableInteger(value: number | null, min: number, max: number): number | null {
-    const number = Number(value);
-
-    if (!Number.isInteger(number) || number < min || number > max) {
-      return null;
-    }
-
-    return number;
-  }
-
   private async errorMessage(response: Response): Promise<string> {
     const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
     return body.message || body.error || 'Unable to read the Pool Sheet with Google Vision.';
-  }
-
-  private normalizeOcrLines(lines: SheetScanOcrLine[] | undefined): SheetScanOcrLine[] {
-    return Array.isArray(lines)
-      ? lines
-          .map((line) => ({
-            text: typeof line.text === 'string' ? line.text.replace(/\s+/g, ' ').trim() : '',
-            bounds: {
-              x: Number(line.bounds?.x) || 0,
-              y: Number(line.bounds?.y) || 0,
-              width: Number(line.bounds?.width) || 0,
-              height: Number(line.bounds?.height) || 0
-            },
-            confidence: typeof line.confidence === 'number' ? line.confidence : null
-          }))
-          .filter((line) => line.text)
-          .sort((left, right) => left.bounds.y - right.bounds.y || left.bounds.x - right.bounds.x)
-      : [];
   }
 
   private lineBottom(line: SheetScanOcrLine): number {

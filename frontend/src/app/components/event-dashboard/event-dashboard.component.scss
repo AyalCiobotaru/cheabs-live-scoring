@@ -1,0 +1,209 @@
+:host,
+.event-dashboard {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.event-title,
+.pool-card header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.dashboard-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-view-toggle button.active {
+  background: #143f6b;
+  border-color: #143f6b;
+  color: #ffffff;
+}
+
+.division-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.division-group,
+.division-subgroup {
+  display: grid;
+  gap: 10px;
+}
+
+.division-subgroup summary {
+  align-items: center;
+  color: #34465c;
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.division-subgroup summary button,
+.division-heading-actions button {
+  padding: 7px 10px;
+}
+
+.division-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.division-heading h3 {
+  color: #34465c;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.division-heading span {
+  color: #5d6878;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.division-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.pool-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pool-card {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.pool-card:hover {
+  border-color: #9db1c8;
+}
+
+.pool-card-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.pool-card-title {
+  color: #143f6b;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pool-card-delete {
+  flex: 0 0 auto;
+}
+
+.pool-hidden-badge {
+  background: #fff8e8;
+  border: 1px solid #e1c582;
+  border-radius: 999px;
+  color: #6d4f08;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.favorite-toggle {
+  align-items: center;
+  color: #526071;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 20px;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+
+.favorite-toggle.active {
+  background: #fff8e8;
+  border-color: #e1c582;
+  color: #9a6a00;
+}
+
+.event-title p,
+.pool-card p {
+  color: #5d6878;
+  margin: 0;
+}
+
+button {
+  background: #143f6b;
+  border: 1px solid #143f6b;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+button:hover {
+  background: #0f3155;
+}
+
+.secondary {
+  background: #ffffff;
+  border-color: #b8c5d6;
+  color: #34465c;
+}
+
+.secondary:hover {
+  background: #eef3f8;
+}
+
+.danger {
+  background: #ffffff;
+  border-color: #c99191;
+  color: #9c2e2e;
+}
+
+.danger:hover {
+  background: #fff1f1;
+}
+
+.icon-button {
+  align-items: center;
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  width: 40px;
+}
+
+@media (max-width: 900px) {
+  .pool-grid {
+    grid-template-columns: 1fr;
+  }
+}

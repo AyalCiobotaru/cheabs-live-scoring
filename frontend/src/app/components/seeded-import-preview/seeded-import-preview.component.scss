@@ -1,0 +1,173 @@
+:host {
+  display: grid;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.setup-panel {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.seeded-preview-panel {
+  grid-column: 1 / -1;
+}
+
+.seeded-preview-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  position: relative;
+}
+
+.info-tooltip-button {
+  align-items: center;
+  background: #eef3f8;
+  border: 1px solid #b8c5d6;
+  border-radius: 50%;
+  color: #34465c;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  position: relative;
+  width: 24px;
+}
+
+.info-tooltip-button:hover,
+.info-tooltip-button:focus-visible {
+  background: #dfe8f2;
+  color: #143f6b;
+}
+
+.persistent-tooltip {
+  background: #17202b;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  left: calc(100% + 8px);
+  line-height: 1.35;
+  max-width: min(300px, 80vw);
+  padding: 8px 10px;
+  position: absolute;
+  top: 0;
+  white-space: pre-line;
+  width: max-content;
+  z-index: 20;
+}
+
+.scan-summary {
+  background: #f6faf7;
+  border: 1px solid #bad7c4;
+  border-radius: 6px;
+  color: #244634;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.scan-summary h3 {
+  font-size: 15px;
+}
+
+.scan-summary ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.scan-summary li {
+  font-size: 13px;
+}
+
+.seeded-errors {
+  background: #fff1f1;
+  border-color: #e1b1b1;
+  color: #8f2525;
+}
+
+.seeded-warnings {
+  background: #fff8e8;
+  border-color: #e1c582;
+  color: #6d4f08;
+}
+
+.seeded-preview-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pool-card {
+  background: #ffffff;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.pool-card-title {
+  color: #143f6b;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pool-card p,
+.empty-copy {
+  color: #5d6878;
+  margin: 0;
+}
+
+.seeded-team-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.seeded-team-list li {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.seeded-team-list strong {
+  background: #eef3f8;
+  border-radius: 4px;
+  color: #34465c;
+  font-size: 12px;
+  padding: 5px;
+  text-align: center;
+}
+
+.seeded-team-list span {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .seeded-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}

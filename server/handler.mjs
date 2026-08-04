@@ -1,53 +1,10 @@
 import { Rest } from 'ably';
-import vision from '@google-cloud/vision';
+import { readPoolSheetOcr } from './sheet-ocr.mjs';
+import { buildCsvImportEvent } from './csv-import.mjs';
 
 const EVENT_TTL_SECONDS = 31 * 24 * 60 * 60;
 const DIVISION_OPTIONS = ['Open', 'AA', 'A/AA', 'A', 'BB', 'B/BB', 'B'];
 const POOL_CATEGORY_OPTIONS = ['Women', 'Men', 'Coed', 'RevCo'];
-const CSV_IMPORT_HEADERS = [
-  'event_code',
-  'event_name',
-  'pool_key',
-  'pool_title',
-  'pool_order',
-  'division',
-  'team_count',
-  'games_per_match',
-  'target_score',
-  'point_cap',
-  'schedule_preset',
-  'seed',
-  'team_name'
-];
-const REQUIRED_IMPORT_VALUES = new Set([
-  'event_code',
-  'event_name',
-  'pool_key',
-  'pool_title',
-  'division',
-  'team_count',
-  'seed',
-  'team_name'
-]);
-const IMPORT_POOL_SETTING_COLUMNS = [
-  'pool_title',
-  'pool_order',
-  'division',
-  'team_count',
-  'games_per_match',
-  'target_score',
-  'point_cap',
-  'schedule_preset'
-];
-const IMPORT_NUMERIC_COLUMNS = new Set([
-  'pool_order',
-  'team_count',
-  'games_per_match',
-  'target_score',
-  'point_cap',
-  'seed'
-]);
-const SUPPORTED_TEAM_COUNTS = new Set([3, 4, 5, 6, 7]);
 const STANDARD_SCHEDULES = {
   3: [
     [1, 2, 3],
@@ -120,8 +77,6 @@ const STANDARD_SCHEDULES = {
 };
 
 let ablyRest;
-let visionClient;
-
 export async function handleApiRequest(request, response) {
   try {
     if (request.method === 'OPTIONS') {
@@ -193,7 +148,13 @@ export async function handleApiRequest(request, response) {
     if (route === 'POST /api/scoring/events/import') {
       requireAdmin(request);
       const payload = await readJson(request);
-      const result = await buildCsvImportEvent(payload);
+      const result = await buildCsvImportEvent(payload, {
+        createId,
+        createTemplateMatches,
+        defaultTargetScore,
+        normalizeEventCode,
+        sanitizeEvent
+      });
 
       if (result.errors.length > 0) {
         return json(response, { errors: result.errors, warnings: result.warnings }, 400);
@@ -813,253 +774,6 @@ function hasStartedScoring(pool) {
   );
 }
 
-async function buildCsvImportEvent(payload) {
-  const rows = Array.isArray(payload?.rows) ? payload.rows.map(normalizeImportRow).filter(Boolean) : [];
-  const errors = [];
-  const warnings = [];
-  const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
-  const eventCodes = uniqueNonEmpty(rows.map((row) => row.values.event_code)).map((code) =>
-    normalizeImportCode(code, errors)
-  );
-  const eventNames = uniqueNonEmpty(rows.map((row) => row.values.event_name));
-  const pools = new Map();
-  const now = new Date().toISOString();
-
-  if (!fileName.toLowerCase().endsWith('.csv')) {
-    errors.push({ lineNumber: null, message: 'Selected file does not use a .csv extension.' });
-  }
-
-  if (rows.length === 0) {
-    errors.push({ lineNumber: null, message: 'CSV import has no rows.' });
-  }
-
-  for (const row of rows) {
-    for (const required of REQUIRED_IMPORT_VALUES) {
-      if (!row.values[required]) {
-        errors.push({ lineNumber: row.lineNumber, message: `Missing required value "${required}".` });
-      }
-    }
-
-    for (const column of IMPORT_NUMERIC_COLUMNS) {
-      if (row.values[column] && !/^\d+$/.test(row.values[column])) {
-        errors.push({ lineNumber: row.lineNumber, message: `"${column}" must be a whole number.` });
-      }
-    }
-  }
-
-  if (eventCodes.length === 0 || !eventCodes[0]) {
-    errors.push({ lineNumber: null, message: 'Missing event_code.' });
-  } else if (new Set(eventCodes).size > 1) {
-    errors.push({ lineNumber: null, message: 'More than one event_code found.' });
-  }
-
-  if (eventNames.length === 0) {
-    errors.push({ lineNumber: null, message: 'Missing event_name.' });
-  } else if (eventNames.length > 1) {
-    errors.push({ lineNumber: null, message: 'More than one event_name found.' });
-  }
-
-  for (const row of rows) {
-    const key = row.values.pool_key;
-
-    if (!key) {
-      continue;
-    }
-
-    const settings = importSettingsFor(row);
-    const team = importTeamFor(row);
-    const existing = pools.get(key);
-
-    if (!existing) {
-      pools.set(key, {
-        key,
-        firstLineNumber: row.lineNumber,
-        settings,
-        teams: team ? [team] : []
-      });
-      continue;
-    }
-
-    for (const column of IMPORT_POOL_SETTING_COLUMNS) {
-      if ((existing.settings[column] ?? '') !== (settings[column] ?? '')) {
-        errors.push({
-          lineNumber: row.lineNumber,
-          message: `"${column}" conflicts with row ${existing.firstLineNumber} for pool_key "${key}".`
-        });
-      }
-    }
-
-    if (team) {
-      existing.teams.push(team);
-    }
-  }
-
-  const eventPools = [...pools.values()].map((pool) => buildImportedPool(pool, now, errors, warnings));
-  const event = sanitizeEvent(
-    {
-      code: eventCodes[0] ?? '',
-      name: eventNames[0] ?? eventCodes[0] ?? '',
-      pools: eventPools,
-      activePoolId: eventPools[0]?.id ?? null,
-      updatedAt: now
-    },
-    eventCodes[0] || 'IMPORT-ERROR'
-  );
-
-  event.activePoolId = eventPools[0]?.id ?? null;
-
-  return { event, errors, warnings };
-}
-
-function normalizeImportRow(row) {
-  if (!row || typeof row !== 'object') {
-    return null;
-  }
-
-  const values = {};
-  const source = row.values && typeof row.values === 'object' ? row.values : {};
-
-  for (const header of CSV_IMPORT_HEADERS) {
-    values[header] = typeof source[header] === 'string' ? source[header].trim() : '';
-  }
-
-  return {
-    lineNumber: Number.isInteger(row.lineNumber) && row.lineNumber > 0 ? row.lineNumber : null,
-    values
-  };
-}
-
-function normalizeImportCode(value, errors) {
-  try {
-    return normalizeEventCode(value);
-  } catch (error) {
-    errors.push({ lineNumber: null, message: error.message });
-    return '';
-  }
-}
-
-function importSettingsFor(row) {
-  return IMPORT_POOL_SETTING_COLUMNS.reduce((settings, column) => {
-    settings[column] = row.values[column] ?? '';
-    return settings;
-  }, {});
-}
-
-function importTeamFor(row) {
-  const seed = integerOrNull(row.values.seed);
-
-  if (seed == null) {
-    return null;
-  }
-
-  const name = row.values.team_name ?? '';
-
-  return {
-    seed,
-    name,
-    normalizedName: name.trim().replace(/\s+/g, ' ').toLowerCase(),
-    lineNumber: row.lineNumber
-  };
-}
-
-function buildImportedPool(pool, now, errors, warnings) {
-  const teamCount = integerOrNull(pool.settings.team_count) ?? 0;
-  const gamesPerMatch = integerOrNull(pool.settings.games_per_match) ?? 2;
-  const targetScore = integerOrNull(pool.settings.target_score) ?? defaultTargetScore(teamCount);
-  const pointCap = pool.settings.point_cap ? integerOrNull(pool.settings.point_cap) : null;
-  const seeds = new Set();
-  const names = new Set();
-
-  if (!DIVISION_OPTIONS.includes(pool.settings.division)) {
-    errors.push({ lineNumber: pool.firstLineNumber, message: `Unknown division "${pool.settings.division}".` });
-  }
-
-  if (!SUPPORTED_TEAM_COUNTS.has(teamCount)) {
-    errors.push({ lineNumber: pool.firstLineNumber, message: '"team_count" must be one of 3, 4, 5, 6, or 7.' });
-  }
-
-  if (pointCap != null && pointCap < targetScore) {
-    errors.push({
-      lineNumber: pool.firstLineNumber,
-      message: '"point_cap" must be greater than or equal to target_score.'
-    });
-  }
-
-  if (!pool.settings.games_per_match) {
-    warnings.push({ lineNumber: pool.firstLineNumber, message: 'Blank games_per_match will default to 2.' });
-  }
-
-  if (!pool.settings.target_score) {
-    warnings.push({
-      lineNumber: pool.firstLineNumber,
-      message: `Blank target_score will default to ${defaultTargetScore(teamCount)}.`
-    });
-  }
-
-  if (!pool.settings.point_cap) {
-    warnings.push({ lineNumber: pool.firstLineNumber, message: 'Blank point_cap means no cap.' });
-  }
-
-  if (pool.settings.schedule_preset && pool.settings.schedule_preset !== 'default') {
-    errors.push({ lineNumber: pool.firstLineNumber, message: 'Only schedule_preset "default" is supported in v1.' });
-  }
-
-  for (const team of pool.teams) {
-    if (seeds.has(team.seed)) {
-      errors.push({ lineNumber: team.lineNumber, message: `Duplicate seed ${team.seed} in pool_key "${pool.key}".` });
-    }
-
-    seeds.add(team.seed);
-
-    if (names.has(team.normalizedName)) {
-      warnings.push({ lineNumber: team.lineNumber, message: `Duplicate team_name "${team.name}".` });
-    }
-
-    names.add(team.normalizedName);
-  }
-
-  for (let seed = 1; seed <= teamCount; seed += 1) {
-    if (!seeds.has(seed)) {
-      errors.push({ lineNumber: pool.firstLineNumber, message: `Missing seed ${seed} in pool_key "${pool.key}".` });
-    }
-  }
-
-  if (pool.teams.length > teamCount) {
-    errors.push({
-      lineNumber: pool.firstLineNumber,
-      message: `More than ${teamCount} teams in pool_key "${pool.key}".`
-    });
-  }
-
-  if (pool.teams.length < teamCount) {
-    errors.push({
-      lineNumber: pool.firstLineNumber,
-      message: `Fewer than ${teamCount} teams in pool_key "${pool.key}".`
-    });
-  }
-
-  return {
-    id: createId(),
-    title: pool.settings.pool_title || 'Pool',
-    category: 'Men',
-    division: pool.settings.division,
-    teamCount,
-    gamesPerMatch,
-    targetScore,
-    pointCap,
-    editable: true,
-    matchStartTimerMinutes: 10,
-    courtNumbers: [],
-    nextMatchStartAt: null,
-    nextMatchStartSourceMatchId: null,
-    teams: pool.teams.map(({ seed, name }) => ({ seed, name })).sort((left, right) => left.seed - right.seed),
-    matches: createTemplateMatches(teamCount, gamesPerMatch, now),
-    seededPoolSource: null,
-    imagePreview: null,
-    updatedAt: now
-  };
-}
-
 function createTemplateMatches(teamCount, gamesPerMatch, now) {
   const rows = STANDARD_SCHEDULES[teamCount] ?? [];
 
@@ -1077,14 +791,6 @@ function createTemplateMatches(teamCount, gamesPerMatch, now) {
     final: false,
     updatedAt: now
   }));
-}
-
-function integerOrNull(value) {
-  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : null;
-}
-
-function uniqueNonEmpty(values) {
-  return [...new Set(values.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean))];
 }
 
 function stripEventImages(event) {
@@ -1172,176 +878,6 @@ async function readJson(request) {
 
 function clampWholeNumber(value, min, max) {
   return Math.min(max, Math.max(min, wholeNumber(value)));
-}
-
-async function readPoolSheetOcr(imageDataUrl) {
-  const content = dataUrlToBase64(imageDataUrl);
-  const client = googleVisionClient();
-  const [result] = await client.documentTextDetection({
-    image: { content }
-  });
-  const text = result.fullTextAnnotation?.text ?? result.textAnnotations?.[0]?.description ?? '';
-
-  return {
-    text,
-    lines: extractOcrLines(result.fullTextAnnotation)
-  };
-}
-
-function extractOcrLines(fullTextAnnotation) {
-  const lines = [];
-
-  for (const page of fullTextAnnotation?.pages ?? []) {
-    for (const block of page.blocks ?? []) {
-      for (const paragraph of block.paragraphs ?? []) {
-        const words = (paragraph.words ?? []).map(normalizeVisionWord).filter(Boolean);
-
-        if (words.length === 0) {
-          continue;
-        }
-
-        lines.push(...groupWordsIntoLines(words));
-      }
-    }
-  }
-
-  return lines.sort((left, right) => left.bounds.y - right.bounds.y || left.bounds.x - right.bounds.x);
-}
-
-function normalizeVisionWord(word) {
-  const text = (word.symbols ?? []).map((symbol) => symbol.text ?? '').join('');
-  const bounds = boundsFromVertices(word.boundingBox?.vertices ?? []);
-
-  if (!text.trim() || !bounds) {
-    return null;
-  }
-
-  return {
-    text,
-    bounds,
-    confidence: typeof word.confidence === 'number' ? word.confidence : null
-  };
-}
-
-function groupWordsIntoLines(words) {
-  const sortedWords = [...words].sort(
-    (left, right) => lineCenter(left) - lineCenter(right) || left.bounds.x - right.bounds.x
-  );
-  const groups = [];
-
-  for (const word of sortedWords) {
-    const center = lineCenter(word);
-    const existing = groups.find((group) => Math.abs(group.center - center) <= Math.max(8, group.height * 0.6));
-
-    if (existing) {
-      existing.words.push(word);
-      existing.center = (existing.center + center) / 2;
-      existing.height = Math.max(existing.height, word.bounds.height);
-    } else {
-      groups.push({
-        center,
-        height: word.bounds.height,
-        words: [word]
-      });
-    }
-  }
-
-  return groups.map((group) => {
-    const lineWords = group.words.sort((left, right) => left.bounds.x - right.bounds.x);
-    const bounds = mergeBounds(lineWords.map((word) => word.bounds));
-
-    return {
-      text: lineWords.map((word) => word.text).join(' '),
-      bounds,
-      confidence: averageConfidence(lineWords)
-    };
-  });
-}
-
-function lineCenter(word) {
-  return word.bounds.y + word.bounds.height / 2;
-}
-
-function boundsFromVertices(vertices) {
-  const xs = vertices.map((vertex) => vertex.x).filter((value) => typeof value === 'number');
-  const ys = vertices.map((vertex) => vertex.y).filter((value) => typeof value === 'number');
-
-  if (xs.length === 0 || ys.length === 0) {
-    return null;
-  }
-
-  const left = Math.min(...xs);
-  const top = Math.min(...ys);
-  const right = Math.max(...xs);
-  const bottom = Math.max(...ys);
-
-  return {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top
-  };
-}
-
-function mergeBounds(boundsList) {
-  const left = Math.min(...boundsList.map((bounds) => bounds.x));
-  const top = Math.min(...boundsList.map((bounds) => bounds.y));
-  const right = Math.max(...boundsList.map((bounds) => bounds.x + bounds.width));
-  const bottom = Math.max(...boundsList.map((bounds) => bounds.y + bounds.height));
-
-  return {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top
-  };
-}
-
-function averageConfidence(words) {
-  const confidences = words.map((word) => word.confidence).filter((confidence) => typeof confidence === 'number');
-
-  if (confidences.length === 0) {
-    return null;
-  }
-
-  return confidences.reduce((sum, confidence) => sum + confidence, 0) / confidences.length;
-}
-
-function googleVisionClient() {
-  if (visionClient) {
-    return visionClient;
-  }
-
-  const credentialsJson =
-    process.env.GOOGLE_CLOUD_VISION_CREDENTIALS_JSON ?? process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  const options = {};
-
-  if (credentialsJson) {
-    try {
-      options.credentials = JSON.parse(credentialsJson);
-      options.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID ?? options.credentials.project_id;
-    } catch {
-      throw httpError(503, 'Google Cloud Vision credentials JSON is invalid.', 'ERR_GOOGLE_VISION_CONFIG');
-    }
-  }
-
-  visionClient = new vision.ImageAnnotatorClient(options);
-  return visionClient;
-}
-
-function dataUrlToBase64(imageDataUrl) {
-  if (typeof imageDataUrl !== 'string' || !imageDataUrl.trim()) {
-    throw httpError(400, 'Pool Sheet image is required.', 'ERR_IMAGE_REQUIRED');
-  }
-
-  const match = imageDataUrl.match(/^data:image\/[a-z0-9.+-]+;base64,(.+)$/i);
-  const base64 = match?.[1] ?? imageDataUrl;
-
-  if (!/^[a-z0-9+/=\s]+$/i.test(base64)) {
-    throw httpError(400, 'Pool Sheet image must be base64 encoded.', 'ERR_IMAGE_INVALID');
-  }
-
-  return base64.replace(/\s+/g, '');
 }
 
 function defaultTargetScore(teamCount) {

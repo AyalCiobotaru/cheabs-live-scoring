@@ -6,7 +6,8 @@ import { PoolSummaryComponent } from '../pool-summary/pool-summary.component';
   selector: 'app-event-dashboard',
   standalone: true,
   imports: [PoolSummaryComponent],
-  templateUrl: './event-dashboard.component.html'
+  templateUrl: './event-dashboard.component.html',
+  styleUrl: './event-dashboard.component.scss'
 })
 export class EventDashboardComponent {
   @Input({ required: true }) event!: EventState;

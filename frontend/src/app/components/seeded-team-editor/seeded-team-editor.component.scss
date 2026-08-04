@@ -1,0 +1,143 @@
+:host,
+.seeded-team-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.section-title {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.seeded-team-table {
+  border: 1px solid #d8e0ea;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.seeded-team-table-header,
+.seeded-team-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 52px minmax(160px, 1fr) 78px minmax(190px, auto);
+  padding: 8px;
+}
+
+.seeded-team-table-header {
+  background: #f3f6fa;
+  color: #34465c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.seeded-team-row {
+  border-top: 1px solid #e3e9f1;
+}
+
+.seeded-team-row strong {
+  background: #eef3f8;
+  border-radius: 4px;
+  color: #34465c;
+  font-size: 12px;
+  padding: 7px 5px;
+  text-align: center;
+}
+
+.seeded-team-row input {
+  border: 1px solid #bcc8d6;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font: inherit;
+  min-height: 40px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.seeded-team-move-actions,
+.seeded-team-row-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.seeded-team-move-actions {
+  justify-content: center;
+}
+
+.seeded-team-row-actions {
+  justify-content: flex-end;
+}
+
+button {
+  background: #143f6b;
+  border: 1px solid #143f6b;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+button:disabled {
+  background: #d8e0ea;
+  border-color: #c5d0dd;
+  color: #718093;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: #ffffff;
+  border-color: #b8c5d6;
+  color: #34465c;
+}
+
+.secondary:hover {
+  background: #eef3f8;
+}
+
+.danger {
+  background: #ffffff;
+  border-color: #c99191;
+  color: #9c2e2e;
+}
+
+.danger:hover {
+  background: #fff1f1;
+}
+
+.icon-button {
+  align-items: center;
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  width: 40px;
+}
+
+.empty-copy {
+  color: #5d6878;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .seeded-team-table-header {
+    display: none;
+  }
+
+  .seeded-team-row {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .seeded-team-move-actions,
+  .seeded-team-row-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

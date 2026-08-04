@@ -12,19 +12,17 @@ import {
 import { FormsModule } from '@angular/forms';
 import { readSheet } from 'read-excel-file/browser';
 import { PoolState, ScanSummary, SeededImportFormats, SeededImportPreview } from '../../models';
+import { PoolSheetPanelComponent } from '../pool-sheet-panel/pool-sheet-panel.component';
+import { SeededImportPreviewComponent } from '../seeded-import-preview/seeded-import-preview.component';
+import { SeededTeamEditorComponent, SeededTeamRow } from '../seeded-team-editor/seeded-team-editor.component';
 import { assignCourtNumbersToMatches, courtNumbersText, parseCourtNumbers } from '../../util/pool-setup-rules';
 import { SchedulePreset } from '../../util/schedule-presets';
 import { DEFAULT_SEEDED_IMPORT_FORMATS, buildSeededImportPreview } from '../../util/seeded-pool-import-rules';
 
-interface SeededTeamRow {
-  id: string;
-  name: string;
-}
-
 @Component({
   selector: 'app-pool-setup',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PoolSheetPanelComponent, SeededImportPreviewComponent, SeededTeamEditorComponent],
   templateUrl: './pool-setup.component.html'
 })
 export class PoolSetupComponent implements OnChanges {
@@ -237,55 +235,13 @@ export class PoolSetupComponent implements OnChanges {
     this.refreshSeededPreview();
   }
 
-  addSeededTeam(): void {
-    this.seededTeamRows = [...this.seededTeamRows, this.createSeededTeamRow()];
-    this.refreshSeededPreview();
-  }
-
-  insertSeededTeamBelow(index: number): void {
-    const rows = [...this.seededTeamRows];
-    rows.splice(index + 1, 0, this.createSeededTeamRow());
+  seededTeamRowsUpdated(rows: SeededTeamRow[]): void {
     this.seededTeamRows = rows;
     this.refreshSeededPreview();
-  }
-
-  removeSeededTeam(index: number): void {
-    this.seededTeamRows = this.seededTeamRows.filter((_, rowIndex) => rowIndex !== index);
-    this.refreshSeededPreview();
-  }
-
-  moveSeededTeam(index: number, direction: -1 | 1): void {
-    const targetIndex = index + direction;
-
-    if (targetIndex < 0 || targetIndex >= this.seededTeamRows.length) {
-      return;
-    }
-
-    const rows = [...this.seededTeamRows];
-    const [row] = rows.splice(index, 1);
-    rows.splice(targetIndex, 0, row);
-    this.seededTeamRows = rows;
-    this.refreshSeededPreview();
-  }
-
-  seededPoolSummary(pool: PoolState): string {
-    return `${pool.teamCount} teams, ${pool.gamesPerMatch} game${pool.gamesPerMatch === 1 ? '' : 's'} to ${
-      pool.targetScore
-    }, ${pool.pointCap === null ? 'no cap' : `cap ${pool.pointCap}`}, ${this.seededTimerSummary(pool)}, ${this.courtSummary(
-      pool
-    )}, ${pool.editable ? 'scoring open' : 'scoring locked'}, ${pool.hidden ? 'hidden' : 'visible'}`;
   }
 
   courtNumbersInput(): string {
     return courtNumbersText(this.pool.courtNumbers ?? []);
-  }
-
-  courtSummary(pool: PoolState): string {
-    const courtNumbers = pool.courtNumbers ?? [];
-
-    return courtNumbers.length
-      ? `court${courtNumbers.length === 1 ? '' : 's'} ${courtNumbers.join(', ')}`
-      : 'no courts';
   }
 
   courtNumbersChanged(value: string): void {
@@ -312,10 +268,6 @@ export class PoolSetupComponent implements OnChanges {
   @HostListener('document:click')
   closeTooltip(): void {
     this.activeTooltipId = '';
-  }
-
-  seededTimerSummary(pool: PoolState): string {
-    return pool.matchStartTimerMinutes > 0 ? `${pool.matchStartTimerMinutes} min between matches` : 'match timer off';
   }
 
   schedulePresetsForSize(size: number): SchedulePreset[] {

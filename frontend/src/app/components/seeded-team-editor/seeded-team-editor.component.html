@@ -1,0 +1,55 @@
+<section class="seeded-team-editor">
+  <div class="section-title">
+    <h3>Seeded team list</h3>
+    <button type="button" class="secondary" (click)="addTeam()">Add team</button>
+  </div>
+  @if (rows.length) {
+    <div class="seeded-team-table">
+      <div class="seeded-team-table-header">
+        <span>Seed</span>
+        <span>Team</span>
+        <span>Move</span>
+        <span>Actions</span>
+      </div>
+      @for (row of rows; track row.id; let index = $index; let first = $first; let last = $last) {
+        <div class="seeded-team-row">
+          <strong>{{ index + 1 }}</strong>
+          <input
+            type="text"
+            [ngModel]="row.name"
+            (ngModelChange)="nameChanged(row, $event)"
+            [attr.aria-label]="'Seed ' + (index + 1) + ' team name'"
+          />
+          <div class="seeded-team-move-actions">
+            <button
+              type="button"
+              class="secondary icon-button"
+              (click)="move(index, -1)"
+              [disabled]="first"
+              aria-label="Move team up"
+              title="Move team up"
+            >
+              &uarr;
+            </button>
+            <button
+              type="button"
+              class="secondary icon-button"
+              (click)="move(index, 1)"
+              [disabled]="last"
+              aria-label="Move team down"
+              title="Move team down"
+            >
+              &darr;
+            </button>
+          </div>
+          <div class="seeded-team-row-actions">
+            <button type="button" class="secondary" (click)="insertBelow(index)">Insert below</button>
+            <button type="button" class="danger" (click)="remove(index)">&times;</button>
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="empty-copy">Upload a seeded team file or add teams manually.</p>
+  }
+</section>

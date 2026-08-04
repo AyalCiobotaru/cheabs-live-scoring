@@ -1,0 +1,63 @@
+<div class="setup-panel camera-panel">
+  <h2>Pool Sheet</h2>
+  @if (isAdmin) {
+    <label class="camera-button">
+      <span>Take Pool Sheet photo</span>
+      <input type="file" accept="image/*" capture="environment" (change)="sheetCaptured.emit($event)" />
+    </label>
+    <button
+      type="button"
+      class="secondary"
+      (click)="sheetScanned.emit()"
+      [disabled]="!imagePreview || scanStatus === 'scanning'"
+    >
+      {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
+    </button>
+  }
+  @if (scanStatus === 'scanning' && scanProgress) {
+    <p class="scan-progress">{{ scanProgress }}</p>
+  }
+  @if (scanStatus === 'success' && scanSummary) {
+    <section class="scan-summary">
+      <h3>Pool Sheet Read</h3>
+      @if (scanSummary.read.length) {
+        <div>
+          <strong>Read</strong>
+          <ul>
+            @for (item of scanSummary.read; track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      }
+      @if (scanSummary.assumed.length) {
+        <div>
+          <strong>Assumed</strong>
+          <ul>
+            @for (item of scanSummary.assumed; track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      }
+      @if (scanSummary.manual.length) {
+        <div>
+          <strong>Check</strong>
+          <ul>
+            @for (item of scanSummary.manual; track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      }
+    </section>
+  }
+  @if (scanError) {
+    <p class="scan-error">{{ scanError }}</p>
+  }
+  @if (imagePreview) {
+    <img [src]="imagePreview" alt="Captured Pool Sheet preview" />
+  } @else {
+    <div class="preview-placeholder">No photo captured</div>
+  }
+</div>

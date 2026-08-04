@@ -1,68 +1,15 @@
 <section class="setup-grid">
   @if (setupMode === 'manual') {
-    <div class="setup-panel camera-panel">
-      <h2>Pool Sheet</h2>
-      @if (isAdmin) {
-        <label class="camera-button">
-          <span>Take Pool Sheet photo</span>
-          <input type="file" accept="image/*" capture="environment" (change)="sheetCaptured.emit($event)" />
-        </label>
-        <button
-          type="button"
-          class="secondary"
-          (click)="sheetScanned.emit()"
-          [disabled]="!pool.imagePreview || scanStatus === 'scanning'"
-        >
-          {{ scanStatus === 'scanning' ? 'Reading Pool Sheet...' : 'Read Pool Sheet' }}
-        </button>
-      }
-      @if (scanStatus === 'scanning' && scanProgress) {
-        <p class="scan-progress">{{ scanProgress }}</p>
-      }
-      @if (scanStatus === 'success' && scanSummary) {
-        <section class="scan-summary">
-          <h3>Pool Sheet Read</h3>
-          @if (scanSummary.read.length) {
-            <div>
-              <strong>Read</strong>
-              <ul>
-                @for (item of scanSummary.read; track item) {
-                  <li>{{ item }}</li>
-                }
-              </ul>
-            </div>
-          }
-          @if (scanSummary.assumed.length) {
-            <div>
-              <strong>Assumed</strong>
-              <ul>
-                @for (item of scanSummary.assumed; track item) {
-                  <li>{{ item }}</li>
-                }
-              </ul>
-            </div>
-          }
-          @if (scanSummary.manual.length) {
-            <div>
-              <strong>Check</strong>
-              <ul>
-                @for (item of scanSummary.manual; track item) {
-                  <li>{{ item }}</li>
-                }
-              </ul>
-            </div>
-          }
-        </section>
-      }
-      @if (scanError) {
-        <p class="scan-error">{{ scanError }}</p>
-      }
-      @if (pool.imagePreview) {
-        <img [src]="pool.imagePreview" alt="Captured Pool Sheet preview" />
-      } @else {
-        <div class="preview-placeholder">No photo captured</div>
-      }
-    </div>
+    <app-pool-sheet-panel
+      [isAdmin]="isAdmin"
+      [imagePreview]="pool.imagePreview"
+      [scanStatus]="scanStatus"
+      [scanProgress]="scanProgress"
+      [scanSummary]="scanSummary"
+      [scanError]="scanError"
+      (sheetCaptured)="sheetCaptured.emit($event)"
+      (sheetScanned)="sheetScanned.emit()"
+    ></app-pool-sheet-panel>
   }
 
   <div class="setup-panel" [class.seeded-setup-panel]="setupMode === 'seeded'">
@@ -380,61 +327,10 @@
       @if (seededImportFileName) {
         <p class="match-summary">{{ seededImportFileName }}</p>
       }
-      <section class="seeded-team-editor">
-        <div class="section-title">
-          <h3>Seeded team list</h3>
-          <button type="button" class="secondary" (click)="addSeededTeam()">Add team</button>
-        </div>
-        @if (seededTeamRows.length) {
-          <div class="seeded-team-table">
-            <div class="seeded-team-table-header">
-              <span>Seed</span>
-              <span>Team</span>
-              <span>Move</span>
-              <span>Actions</span>
-            </div>
-            @for (row of seededTeamRows; track row.id; let index = $index; let first = $first; let last = $last) {
-              <div class="seeded-team-row">
-                <strong>{{ index + 1 }}</strong>
-                <input
-                  type="text"
-                  [(ngModel)]="row.name"
-                  (ngModelChange)="seededTeamRowsChanged()"
-                  [attr.aria-label]="'Seed ' + (index + 1) + ' team name'"
-                />
-                <div class="seeded-team-move-actions">
-                  <button
-                    type="button"
-                    class="secondary icon-button"
-                    (click)="moveSeededTeam(index, -1)"
-                    [disabled]="first"
-                    aria-label="Move team up"
-                    title="Move team up"
-                  >
-                    &uarr;
-                  </button>
-                  <button
-                    type="button"
-                    class="secondary icon-button"
-                    (click)="moveSeededTeam(index, 1)"
-                    [disabled]="last"
-                    aria-label="Move team down"
-                    title="Move team down"
-                  >
-                    &darr;
-                  </button>
-                </div>
-                <div class="seeded-team-row-actions">
-                  <button type="button" class="secondary" (click)="insertSeededTeamBelow(index)">Insert below</button>
-                  <button type="button" class="danger" (click)="removeSeededTeam(index)">&times;</button>
-                </div>
-              </div>
-            }
-          </div>
-        } @else {
-          <p class="empty-copy">Upload a seeded team file or add teams manually.</p>
-        }
-      </section>
+      <app-seeded-team-editor
+        [rows]="seededTeamRows"
+        (rowsChange)="seededTeamRowsUpdated($event)"
+      ></app-seeded-team-editor>
       @if (seededImportReading) {
         <p class="scan-progress">Reading seeded team file...</p>
       }
@@ -462,74 +358,7 @@
   </div>
 
   @if (setupMode === 'seeded') {
-    <div class="setup-panel seeded-preview-panel">
-      <div class="seeded-preview-title">
-        <h2>Seeded Import Preview</h2>
-        <button
-          type="button"
-          class="info-tooltip-button"
-          aria-label="How seeded import creates pools"
-          (click)="toggleTooltip($event, 'seeded-import-preview')"
-          title="Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If 5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest with 4-team pools when that count can be represented cleanly."
-        >
-          i
-        </button>
-        @if (activeTooltipId === 'seeded-import-preview') {
-          <span class="persistent-tooltip">
-            Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread
-            across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If
-            5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest
-            with 4-team pools when that count can be represented cleanly.
-          </span>
-        }
-      </div>
-      @if (seededImportPreview) {
-        @if (seededImportPreview.errors.length) {
-          <section class="scan-summary seeded-errors">
-            <h3>Blocking errors</h3>
-            <ul>
-              @for (issue of seededImportPreview.errors; track $index) {
-                <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
-              }
-            </ul>
-          </section>
-        }
-        @if (seededImportPreview.warnings.length) {
-          <section class="scan-summary seeded-warnings">
-            <h3>Warnings</h3>
-            <ul>
-              @for (issue of seededImportPreview.warnings; track $index) {
-                <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
-              }
-            </ul>
-          </section>
-        }
-        @if (seededImportPreview.pools.length) {
-          <div class="seeded-preview-grid">
-            @for (previewPool of seededImportPreview.pools; track previewPool.id) {
-              <article class="pool-card">
-                <header>
-                  <div>
-                    <h3 class="pool-card-title">{{ previewPool.title }}</h3>
-                    <p>{{ seededPoolSummary(previewPool) }}</p>
-                  </div>
-                </header>
-                <ol class="seeded-team-list">
-                  @for (team of previewPool.teams; track team.seed) {
-                    <li>
-                      <strong>{{ team.seededSourceSeed ?? team.seed }}</strong
-                      ><span>{{ team.name }}</span>
-                    </li>
-                  }
-                </ol>
-              </article>
-            }
-          </div>
-        }
-      } @else {
-        <p class="empty-copy">Choose a seeded team CSV or XLSX file to preview generated pools.</p>
-      }
-    </div>
+    <app-seeded-import-preview [preview]="seededImportPreview"></app-seeded-import-preview>
   } @else {
     <div class="setup-panel teams-panel">
       <h2>Teams</h2>

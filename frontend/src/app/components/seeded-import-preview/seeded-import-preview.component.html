@@ -1,0 +1,68 @@
+<div class="setup-panel seeded-preview-panel">
+  <div class="seeded-preview-title">
+    <h2>Seeded Import Preview</h2>
+    <button
+      type="button"
+      class="info-tooltip-button"
+      aria-label="How seeded import creates pools"
+      (click)="toggleTooltip($event, 'seeded-import-preview')"
+      title="Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread across pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If 5-team pools are prioritized, the importer creates as many 5-team pools as possible, then fills the rest with 4-team pools when that count can be represented cleanly."
+    >
+      i
+    </button>
+    @if (activeTooltipId === 'seeded-import-preview') {
+      <span class="persistent-tooltip">
+        Seeds are sorted from 1 down, then placed into pools with a snake pattern so adjacent seed bands spread across
+        pools. By default, most pools are 4 teams and remainder teams become up to three 5-team pools. If 5-team pools
+        are prioritized, the importer creates as many 5-team pools as possible, then fills the rest with 4-team pools
+        when that count can be represented cleanly.
+      </span>
+    }
+  </div>
+  @if (preview) {
+    @if (preview.errors.length) {
+      <section class="scan-summary seeded-errors">
+        <h3>Blocking errors</h3>
+        <ul>
+          @for (issue of preview.errors; track $index) {
+            <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
+          }
+        </ul>
+      </section>
+    }
+    @if (preview.warnings.length) {
+      <section class="scan-summary seeded-warnings">
+        <h3>Warnings</h3>
+        <ul>
+          @for (issue of preview.warnings; track $index) {
+            <li>{{ issue.lineNumber ? 'Row ' + issue.lineNumber + ': ' : '' }}{{ issue.message }}</li>
+          }
+        </ul>
+      </section>
+    }
+    @if (preview.pools.length) {
+      <div class="seeded-preview-grid">
+        @for (previewPool of preview.pools; track previewPool.id) {
+          <article class="pool-card">
+            <header>
+              <div>
+                <h3 class="pool-card-title">{{ previewPool.title }}</h3>
+                <p>{{ seededPoolSummary(previewPool) }}</p>
+              </div>
+            </header>
+            <ol class="seeded-team-list">
+              @for (team of previewPool.teams; track team.seed) {
+                <li>
+                  <strong>{{ team.seededSourceSeed ?? team.seed }}</strong
+                  ><span>{{ team.name }}</span>
+                </li>
+              }
+            </ol>
+          </article>
+        }
+      </div>
+    }
+  } @else {
+    <p class="empty-copy">Choose a seeded team CSV or XLSX file to preview generated pools.</p>
+  }
+</div>
