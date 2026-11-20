@@ -17,22 +17,36 @@
       <button type="button" class="secondary timer-button" (click)="timerButtonClicked($event)">Timer</button>
     }
   </header>
-  <p class="match-summary">{{ matchSummary }}</p>
   @if (currentScore(); as score) {
     <section class="live-score" aria-live="polite">
-      <div class="live-score-heading">
-        <span class="live-indicator">Live</span>
-        <span>Set {{ score.setNumber }}</span>
+      <div class="live-score-row live-score-heading">
+        <span class="live-score-name live-indicator">Live</span>
+        @for (game of score.games; track $index; let setIndex = $index) {
+          <span class="live-score-set" [class.current-set]="setIndex + 1 === score.setNumber">
+            Set {{ setIndex + 1 }}
+          </span>
+        }
       </div>
-      <div class="live-score-team">
-        <span>{{ teamName(score.match.teamASeed) }}</span>
-        <strong>{{ score.game.scoreA }}</strong>
+      <div class="live-score-row live-score-team">
+        <span class="live-score-name">{{ teamName(score.match.teamASeed) }}</span>
+        @for (game of score.games; track $index; let setIndex = $index) {
+          <strong class="live-score-set" [class.current-set]="setIndex + 1 === score.setNumber">
+            {{ game.scoreA }}
+          </strong>
+        }
       </div>
-      <div class="live-score-team">
-        <span>{{ teamName(score.match.teamBSeed) }}</span>
-        <strong>{{ score.game.scoreB }}</strong>
+      <div class="live-score-row live-score-team">
+        <span class="live-score-name">{{ teamName(score.match.teamBSeed) }}</span>
+        @for (game of score.games; track $index; let setIndex = $index) {
+          <strong class="live-score-set" [class.current-set]="setIndex + 1 === score.setNumber">
+            {{ game.scoreB }}
+          </strong>
+        }
       </div>
+      <p class="live-score-work">Work: {{ teamName(score.match.refSeed) }}</p>
     </section>
+  } @else {
+    <p class="match-summary">{{ matchSummary }}</p>
   }
   <div class="summary-standings">
     <div class="summary-standings-header">

@@ -62,17 +62,13 @@ export const buildStandings = (pool: PoolState): TeamStanding[] => {
 };
 
 export const buildMatchSummary = (pool: PoolState): string => {
-  const current = pool.matches.find(
-    (match) => !match.final && match.games.some((game) => wholeNumber(game.scoreA) > 0 || wholeNumber(game.scoreB) > 0)
-  );
-  const next = current ?? pool.matches.find((match) => !match.final);
+  const next = pool.matches.find((match) => !match.final);
 
   if (!next) {
     return 'Complete';
   }
 
-  const label = current ? 'Now' : 'Next';
-  return `${label}:\n${teamName(pool, next.teamASeed)}\nvs\n${teamName(pool, next.teamBSeed)}\nWork: ${teamName(pool, next.refSeed)}`;
+  return `Next:\n${teamName(pool, next.teamASeed)}\nvs\n${teamName(pool, next.teamBSeed)}\nWork: ${teamName(pool, next.refSeed)}`;
 };
 
 export const teamName = (pool: PoolState, seed: number | null): string => {

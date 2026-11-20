@@ -3,7 +3,7 @@ import { GameScore, Match, PoolState, TeamStanding } from '../../models';
 import { wholeNumber } from '../../util/scoring-helpers';
 
 interface CurrentScore {
-  game: GameScore;
+  games: GameScore[];
   match: Match;
   setNumber: number;
 }
@@ -66,7 +66,7 @@ export class PoolSummaryComponent implements OnInit, OnDestroy {
     const currentGameIndex = gameIndex >= 0 ? gameIndex : match.games.length - 1;
 
     return {
-      game: match.games[currentGameIndex],
+      games: match.games.slice(0, currentGameIndex + 1),
       match,
       setNumber: currentGameIndex + 1
     };
