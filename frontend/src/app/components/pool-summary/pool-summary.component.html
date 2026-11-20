@@ -20,7 +20,10 @@
   @if (currentScore(); as score) {
     <section class="live-score" aria-live="polite">
       <div class="live-score-row live-score-heading">
-        <span class="live-score-name live-indicator">Live</span>
+        <span class="live-score-name">
+          <span class="live-indicator">Live</span>
+          <span class="live-score-work">Work: {{ teamName(score.match.refSeed) }}</span>
+        </span>
         @for (game of score.games; track $index; let setIndex = $index) {
           <span class="live-score-set" [class.current-set]="setIndex + 1 === score.setNumber">
             Set {{ setIndex + 1 }}
@@ -43,7 +46,6 @@
           </strong>
         }
       </div>
-      <p class="live-score-work">Work: {{ teamName(score.match.refSeed) }}</p>
     </section>
   } @else {
     <p class="match-summary">{{ matchSummary }}</p>
