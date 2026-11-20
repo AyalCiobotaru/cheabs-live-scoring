@@ -18,6 +18,22 @@
     }
   </header>
   <p class="match-summary">{{ matchSummary }}</p>
+  @if (currentScore(); as score) {
+    <section class="live-score" aria-live="polite">
+      <div class="live-score-heading">
+        <span class="live-indicator">Live</span>
+        <span>Set {{ score.setNumber }}</span>
+      </div>
+      <div class="live-score-team">
+        <span>{{ teamName(score.match.teamASeed) }}</span>
+        <strong>{{ score.game.scoreA }}</strong>
+      </div>
+      <div class="live-score-team">
+        <span>{{ teamName(score.match.teamBSeed) }}</span>
+        <strong>{{ score.game.scoreB }}</strong>
+      </div>
+    </section>
+  }
   <div class="summary-standings">
     <div class="summary-standings-header">
       <span>Team</span>

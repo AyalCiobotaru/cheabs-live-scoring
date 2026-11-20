@@ -35,6 +35,52 @@
   white-space: pre-line;
 }
 
+.live-score {
+  background: #f7fbff;
+  border: 1px solid #b8cbe0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.live-score-heading,
+.live-score-team {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 10px;
+}
+
+.live-score-heading {
+  background: #e8f1fa;
+  color: #34465c;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.live-indicator {
+  color: #b42318;
+}
+
+.live-score-team {
+  border-top: 1px solid #d8e0ea;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.live-score-team span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-score-team strong {
+  font-size: 20px;
+  line-height: 1;
+}
+
 .summary-standings {
   border: 1px solid #d8e0ea;
   border-radius: 5px;

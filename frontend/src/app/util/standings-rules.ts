@@ -15,7 +15,7 @@ export const buildStandings = (pool: PoolState): TeamStanding[] => {
   }
 
   for (const match of pool.matches) {
-    if (!match.final || match.teamASeed == null || match.teamBSeed == null) {
+    if (match.teamASeed == null || match.teamBSeed == null) {
       continue;
     }
 
@@ -27,6 +27,10 @@ export const buildStandings = (pool: PoolState): TeamStanding[] => {
     }
 
     for (const game of match.games) {
+      if (!game.final) {
+        continue;
+      }
+
       const scoreA = wholeNumber(game.scoreA);
       const scoreB = wholeNumber(game.scoreB);
 
@@ -91,10 +95,6 @@ const headToHeadWins = (pool: PoolState, seed: number, opponentSeed: number): nu
   let wins = 0;
 
   for (const match of pool.matches) {
-    if (!match.final) {
-      continue;
-    }
-
     const involvesTeams =
       (match.teamASeed === seed && match.teamBSeed === opponentSeed) ||
       (match.teamASeed === opponentSeed && match.teamBSeed === seed);
@@ -104,6 +104,10 @@ const headToHeadWins = (pool: PoolState, seed: number, opponentSeed: number): nu
     }
 
     for (const game of match.games) {
+      if (!game.final) {
+        continue;
+      }
+
       const scoreA = wholeNumber(game.scoreA);
       const scoreB = wholeNumber(game.scoreB);
 

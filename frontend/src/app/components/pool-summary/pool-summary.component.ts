@@ -1,5 +1,12 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, signal } from '@angular/core';
-import { PoolState, TeamStanding } from '../../models';
+import { GameScore, Match, PoolState, TeamStanding } from '../../models';
+import { wholeNumber } from '../../util/scoring-helpers';
+
+interface CurrentScore {
+  game: GameScore;
+  match: Match;
+  setNumber: number;
+}
 
 @Component({
   selector: 'app-pool-summary',
@@ -42,6 +49,35 @@ export class PoolSummaryComponent implements OnInit, OnDestroy {
 
   truthSeedFor(seed: number): number | null {
     return this.pool.teams.find((team) => team.seed === seed)?.seededSourceSeed ?? null;
+  }
+
+  currentScore(): CurrentScore | null {
+    const match = this.pool.matches.find(
+      (candidate) =>
+        !candidate.final &&
+        candidate.games.some((game) => game.final || wholeNumber(game.scoreA) > 0 || wholeNumber(game.scoreB) > 0)
+    );
+
+    if (!match) {
+      return null;
+    }
+
+    const gameIndex = match.games.findIndex((game) => !game.final);
+    const currentGameIndex = gameIndex >= 0 ? gameIndex : match.games.length - 1;
+
+    return {
+      game: match.games[currentGameIndex],
+      match,
+      setNumber: currentGameIndex + 1
+    };
+  }
+
+  teamName(seed: number | null): string {
+    if (seed == null) {
+      return 'Team';
+    }
+
+    return this.pool.teams.find((team) => team.seed === seed)?.name ?? `Team ${seed}`;
   }
 
   timerStatus(): string {
