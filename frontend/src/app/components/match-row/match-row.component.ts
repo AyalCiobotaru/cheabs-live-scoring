@@ -73,6 +73,20 @@ export class MatchRowComponent {
     this.scoreChanged.emit(game);
   }
 
+  clearZero(event: FocusEvent, score: unknown): void {
+    const input = event.target as HTMLInputElement;
+    if (this.wholeNumber(score) === 0) input.value = '';
+  }
+
+  restoreZero(event: FocusEvent): void {
+    const input = event.target as HTMLInputElement;
+    if (input.value === '') input.value = '0';
+  }
+
+  disableScoreWheel(event: WheelEvent): void {
+    (event.currentTarget as HTMLInputElement).blur();
+  }
+
   markGameFinal(game: GameScore): void {
     if (!this.canScore || !this.canMarkGameFinal(game)) {
       return;

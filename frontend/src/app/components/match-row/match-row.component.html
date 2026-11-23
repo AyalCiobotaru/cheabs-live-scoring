@@ -60,6 +60,9 @@
                   min="0"
                   [max]="pointCap ?? null"
                   [ngModel]="game.scoreA"
+                  (focus)="clearZero($event, game.scoreA)"
+                  (blur)="restoreZero($event)"
+                  (wheel)="disableScoreWheel($event)"
                   (ngModelChange)="setScore(game, 'A', $event)"
                   [disabled]="!canScore || match.final || game.final"
                 />
@@ -90,6 +93,9 @@
                   min="0"
                   [max]="pointCap ?? null"
                   [ngModel]="game.scoreB"
+                  (focus)="clearZero($event, game.scoreB)"
+                  (blur)="restoreZero($event)"
+                  (wheel)="disableScoreWheel($event)"
                   (ngModelChange)="setScore(game, 'B', $event)"
                   [disabled]="!canScore || match.final || game.final"
                 />

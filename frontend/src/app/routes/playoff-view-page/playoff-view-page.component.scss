@@ -12,13 +12,19 @@
 .bracket-rounds {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   overflow-x: auto;
 }
 .bracket-round {
   align-content: center;
+  container-type: inline-size;
   display: grid;
   gap: 12px;
+  justify-items: center;
+  position: relative;
+}
+.mobile-round-nav {
+  display: none;
 }
 .playoff-match {
   border: 1px solid #ccd7e3;
@@ -26,6 +32,32 @@
   display: grid;
   gap: 8px;
   padding: 10px;
+  position: relative;
+  width: min(100%, 420px);
+}
+.bracket-round:not(:first-child) .playoff-match::before {
+  border-top: 2px solid #9babc0;
+  content: '';
+  left: calc(-1 * ((100cqw - 100%) / 2 + 4px));
+  position: absolute;
+  top: 50%;
+  width: calc((100cqw - 100%) / 2 + 4px);
+}
+.bracket-connector {
+  border-right: 2px solid #9babc0;
+  border-top: 2px solid #9babc0;
+  height: calc(50% + 6px);
+  pointer-events: none;
+  position: absolute;
+  right: calc(-1 * ((100cqw - 100%) / 2 + 4px));
+  top: 50%;
+  width: calc((100cqw - 100%) / 2 + 4px);
+}
+.playoff-match:nth-of-type(even) .bracket-connector {
+  border-bottom: 2px solid #9babc0;
+  border-top: 0;
+  bottom: 50%;
+  top: auto;
 }
 .playoff-match.final {
   background: #f1f8f3;
@@ -83,8 +115,51 @@ small {
   gap: 6px;
 }
 @media (max-width: 700px) {
+  .playoff-page .event-title {
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .playoff-page .event-title > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .playoff-page .header-actions {
+    align-items: flex-start;
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 6px;
+  }
+  .playoff-page,
+  .playoff-bracket,
+  .bracket-rounds,
+  .bracket-round,
+  .playoff-match {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+  }
+  .bracket-round .playoff-match::before,
+  .bracket-connector {
+    display: none;
+  }
+  .mobile-round-nav {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .mobile-round-nav button {
+    justify-self: start;
+  }
+  .mobile-round-nav button:last-child {
+    justify-self: end;
+  }
+  .mobile-round-nav strong {
+    text-align: center;
+  }
   .bracket-rounds {
     display: block;
+    overflow-x: visible;
   }
   .bracket-round {
     display: none;

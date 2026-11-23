@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { PlayoffBracket, PlayoffConfiguration, PlayoffMatch } from '../../models';
+import { PlayoffBracket, PlayoffBracketKind, PlayoffConfiguration, PlayoffMatch } from '../../models';
 import { ScoringEventStateService } from '../../service/scoring-event-state.service';
 import {
   playoffResolvedWorkTeamId,
@@ -21,7 +21,7 @@ export class PlayoffViewPageComponent implements OnInit {
   readonly scoring = inject(ScoringEventStateService);
   private readonly route = inject(ActivatedRoute);
   playoffId = '';
-  mobileRound = 0;
+  mobileRounds: Record<PlayoffBracketKind, number> = { gold: 0, silver: 0 };
 
   ngOnInit(): void {
     this.playoffId = this.route.snapshot.paramMap.get('playoffId') ?? '';
@@ -38,6 +38,25 @@ export class PlayoffViewPageComponent implements OnInit {
 
   matches(bracket: PlayoffBracket, round: number): PlayoffMatch[] {
     return bracket.matches.filter((match) => match.round === round).sort((a, b) => a.position - b.position);
+  }
+
+  activeMobileRound(bracket: PlayoffBracket): number {
+    const availableRounds = this.rounds(bracket);
+    const selectedRound = this.mobileRounds[bracket.kind];
+    return availableRounds.includes(selectedRound) ? selectedRound : (availableRounds[0] ?? 0);
+  }
+
+  moveMobileRound(bracket: PlayoffBracket, change: number): void {
+    const availableRounds = this.rounds(bracket);
+    const currentIndex = availableRounds.indexOf(this.activeMobileRound(bracket));
+    const nextIndex = Math.min(availableRounds.length - 1, Math.max(0, currentIndex + change));
+    this.mobileRounds[bracket.kind] = availableRounds[nextIndex] ?? 0;
+  }
+
+  mobileRoundLabel(bracket: PlayoffBracket): string {
+    const availableRounds = this.rounds(bracket);
+    const activeRound = this.activeMobileRound(bracket);
+    return activeRound === availableRounds.at(-1) ? 'Final' : `Round ${activeRound + 1}`;
   }
 
   teamName(teamId: string | null): string {
@@ -90,6 +109,10 @@ export class PlayoffViewPageComponent implements OnInit {
     if (side === 'A') game.scoreA = score;
     else game.scoreB = score;
     void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
+  }
+
+  disableScoreWheel(event: WheelEvent): void {
+    (event.currentTarget as HTMLInputElement).blur();
   }
 
   scoreCap(match: PlayoffMatch, gameIndex: number): number | null {

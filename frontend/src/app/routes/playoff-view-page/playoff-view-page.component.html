@@ -7,7 +7,7 @@
         <h2>Playoffs</h2>
       </div>
       <div class="header-actions">
-        <button type="button" class="secondary" (click)="scoring.openDashboard()">Back</button>
+        <button type="button" class="secondary playoff-back" (click)="scoring.openDashboard()">Back</button>
         @if (scoring.isAdmin) {
           <button type="button" class="secondary" (click)="scoring.editPlayoff(config.id)">Edit setup</button>
           <button type="button" class="danger" (click)="scoring.deletePlayoff(config.id)">Delete</button>
@@ -24,12 +24,36 @@
               <strong>Champion: {{ teamName(bracket.championTeamId) }}</strong>
             }
           </div>
+          @if (rounds(bracket).length > 1) {
+            <nav class="mobile-round-nav" [attr.aria-label]="(bracket.kind === 'gold' ? 'Gold' : 'Silver') + ' rounds'">
+              <button
+                type="button"
+                class="secondary"
+                (click)="moveMobileRound(bracket, -1)"
+                [disabled]="activeMobileRound(bracket) === rounds(bracket)[0]"
+              >
+                Previous
+              </button>
+              <strong>{{ mobileRoundLabel(bracket) }}</strong>
+              <button
+                type="button"
+                class="secondary"
+                (click)="moveMobileRound(bracket, 1)"
+                [disabled]="activeMobileRound(bracket) === rounds(bracket).at(-1)"
+              >
+                Next
+              </button>
+            </nav>
+          }
           <div class="bracket-rounds">
             @for (round of rounds(bracket); track round) {
-              <section class="bracket-round" [class.mobile-active]="mobileRound === round">
+              <section class="bracket-round" [class.mobile-active]="activeMobileRound(bracket) === round">
                 <h4>{{ round === rounds(bracket).length - 1 ? 'Final' : 'Round ' + (round + 1) }}</h4>
                 @for (match of matches(bracket, round); track match.id) {
                   <article class="playoff-match" [class.final]="match.final">
+                    @if (round !== rounds(bracket).at(-1)) {
+                      <span class="bracket-connector" aria-hidden="true"></span>
+                    }
                     <div class="playoff-match-meta">
                       <span>Match {{ match.position + 1 }}</span>
                       @if (match.courtNumber) {
@@ -63,6 +87,7 @@
                                   [max]="scoreCap(match, gameIndex)"
                                   [attr.aria-label]="teamName(match.teamAId) + ' score for set ' + (gameIndex + 1)"
                                   [ngModel]="game.scoreA"
+                                  (wheel)="disableScoreWheel($event)"
                                   (ngModelChange)="setScore(match, gameIndex, 'A', $event)"
                                   [disabled]="!canScore() || game.final"
                                 />
@@ -91,6 +116,7 @@
                                   [max]="scoreCap(match, gameIndex)"
                                   [attr.aria-label]="teamName(match.teamBId) + ' score for set ' + (gameIndex + 1)"
                                   [ngModel]="game.scoreB"
+                                  (wheel)="disableScoreWheel($event)"
                                   (ngModelChange)="setScore(match, gameIndex, 'B', $event)"
                                   [disabled]="!canScore() || game.final"
                                 />
