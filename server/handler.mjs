@@ -137,6 +137,10 @@ export async function handleApiRequest(request, response) {
     const finalMatch = url.pathname.match(
       /^\/api\/scoring\/events\/([A-Z0-9-]+)\/pools\/([^/]+)\/matches\/([^/]+)\/final$/
     );
+    const playoffMatch = url.pathname.match(/^\/api\/scoring\/events\/([A-Z0-9-]+)\/playoffs\/([^/]+)$/);
+    const playoffScoreMatch = url.pathname.match(
+      /^\/api\/scoring\/events\/([A-Z0-9-]+)\/playoffs\/([^/]+)\/matches\/([^/]+)$/
+    );
 
     if (route === 'GET /api/health') {
       return json(response, { ok: true });
@@ -292,6 +296,91 @@ export async function handleApiRequest(request, response) {
       await writeEvent(event);
       await publishEvent(event, 'event-updated');
       return json(response, { event });
+    }
+
+    if (playoffMatch && request.method === 'PUT') {
+      requireAdmin(request);
+      const code = normalizeEventCode(playoffMatch[1]);
+      const playoffId = decodeURIComponent(playoffMatch[2]);
+      const payload = await readJson(request);
+      const event = await readEvent(code);
+      if (!event) throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      const playoff = sanitizePlayoff({ ...payload.playoff, id: playoffId });
+      validatePlayoffForSave(event, playoff);
+      const index = event.playoffs.findIndex((candidate) => candidate.id === playoffId);
+      const duplicate = event.playoffs.some(
+        (candidate) =>
+          candidate.id !== playoffId &&
+          candidate.category === playoff.category &&
+          candidate.division === playoff.division
+      );
+      if (duplicate) {
+        throw httpError(409, 'This category and division already has playoffs.', 'ERR_PLAYOFF_EXISTS');
+      }
+      event.playoffs =
+        index >= 0
+          ? event.playoffs.map((candidate) => (candidate.id === playoffId ? playoff : candidate))
+          : [...event.playoffs, playoff];
+      event.updatedAt = new Date().toISOString();
+      await writeEvent(event);
+      await publishEvent(event, 'event-updated');
+      return json(response, { event, playoff });
+    }
+
+    if (playoffMatch && request.method === 'DELETE') {
+      requireAdmin(request);
+      const code = normalizeEventCode(playoffMatch[1]);
+      const playoffId = decodeURIComponent(playoffMatch[2]);
+      const event = await readEvent(code);
+      if (!event) throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      event.playoffs = event.playoffs.filter((candidate) => candidate.id !== playoffId);
+      event.updatedAt = new Date().toISOString();
+      await writeEvent(event);
+      await publishEvent(event, 'event-updated');
+      return json(response, { event });
+    }
+
+    if (playoffScoreMatch && request.method === 'PUT') {
+      const code = normalizeEventCode(playoffScoreMatch[1]);
+      const playoffId = decodeURIComponent(playoffScoreMatch[2]);
+      const matchId = decodeURIComponent(playoffScoreMatch[3]);
+      const payload = await readJson(request);
+      const event = await readEvent(code);
+      if (!event) throw httpError(404, 'Event not found.', 'ERR_EVENT_NOT_FOUND');
+      const playoff = event.playoffs.find((candidate) => candidate.id === playoffId);
+      if (!playoff || (!playoff.published && !isAdminRequest(request))) {
+        throw httpError(404, 'Playoff bracket not found.', 'ERR_PLAYOFF_NOT_FOUND');
+      }
+      if (!playoff.editable && !isAdminRequest(request)) {
+        throw httpError(403, 'Scoring is closed for these playoffs.', 'ERR_PLAYOFF_NOT_EDITABLE');
+      }
+      const bracket = [...playoff.gold.matches, ...playoff.silver.matches].some((candidate) => candidate.id === matchId)
+        ? playoff.gold.matches.some((candidate) => candidate.id === matchId)
+          ? playoff.gold
+          : playoff.silver
+        : null;
+      if (!bracket) throw httpError(404, 'Playoff match not found.', 'ERR_PLAYOFF_MATCH_NOT_FOUND');
+      const existing = bracket.matches.find((candidate) => candidate.id === matchId);
+      const match = sanitizePlayoffMatch({
+        ...existing,
+        ...payload.match,
+        id: matchId,
+        updatedAt: new Date().toISOString()
+      });
+      if (match.final) {
+        match.winnerTeamId = playoffWinner(match);
+        if (!match.winnerTeamId)
+          throw httpError(400, 'The match does not have a clinched winner.', 'ERR_WINNER_REQUIRED');
+      } else {
+        match.winnerTeamId = null;
+      }
+      bracket.matches = bracket.matches.map((candidate) => (candidate.id === matchId ? match : candidate));
+      applyPlayoffAdvancement(playoff, bracket, match);
+      playoff.updatedAt = match.updatedAt;
+      event.updatedAt = match.updatedAt;
+      await writeEvent(event);
+      await publishEvent(event, 'event-updated');
+      return json(response, { event: isAdminRequest(request) ? event : publicEvent(event), playoff, match });
     }
 
     if (poolMatch && request.method === 'PUT') {
@@ -617,6 +706,7 @@ function normalizePoolCategory(value) {
 
 function sanitizeEvent(event, code) {
   const pools = Array.isArray(event?.pools) ? event.pools.map(sanitizePool).filter(Boolean) : [];
+  const playoffs = Array.isArray(event?.playoffs) ? event.playoffs.map(sanitizePlayoff).filter(Boolean) : [];
   const activePoolId =
     typeof event?.activePoolId === 'string' && pools.some((pool) => pool.id === event.activePoolId)
       ? event.activePoolId
@@ -626,6 +716,7 @@ function sanitizeEvent(event, code) {
     code,
     name: typeof event?.name === 'string' && event.name.trim() ? event.name.trim() : code,
     pools,
+    playoffs,
     activePoolId,
     updatedAt: typeof event?.updatedAt === 'string' ? event.updatedAt : new Date().toISOString()
   };
@@ -672,6 +763,7 @@ function sanitizePool(pool) {
       const team = sourceTeams.find((candidate) => Number(candidate?.seed) === seed);
 
       return {
+        id: typeof team?.id === 'string' && team.id.trim() ? team.id.trim() : `${id}-team-${seed}`,
         seed,
         name: typeof team?.name === 'string' && team.name.trim() ? team.name.trim() : `Team ${seed}`,
         seededSourceSeed: seededSourceSeedOrNull(team?.seededSourceSeed)
@@ -804,6 +896,205 @@ function sanitizeMatch(match, gamesPerMatch, pointCap = 99, teamCount = 7) {
     final: Boolean(match?.final),
     updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : new Date().toISOString()
   };
+}
+
+function sanitizePlayoff(playoff) {
+  const now = new Date().toISOString();
+  return {
+    id: typeof playoff?.id === 'string' && playoff.id.trim() ? playoff.id.trim() : createId(),
+    category: normalizePoolCategory(playoff?.category),
+    division: normalizeDivision(playoff?.division),
+    published: Boolean(playoff?.published),
+    editable: playoff?.editable !== false,
+    reseed: Boolean(playoff?.reseed),
+    goldFinishes: sanitizeFinishList(playoff?.goldFinishes, [1, 2]),
+    silverFinishes: sanitizeFinishList(playoff?.silverFinishes, [3]),
+    gold: sanitizePlayoffBracket(playoff?.gold, 'gold', true),
+    silver: sanitizePlayoffBracket(playoff?.silver, 'silver', Boolean(playoff?.silver?.enabled)),
+    sourceUpdatedAt: typeof playoff?.sourceUpdatedAt === 'string' ? playoff.sourceUpdatedAt : null,
+    unresolvedTiePoolIds: Array.isArray(playoff?.unresolvedTiePoolIds)
+      ? playoff.unresolvedTiePoolIds.filter((value) => typeof value === 'string')
+      : [],
+    updatedAt: typeof playoff?.updatedAt === 'string' ? playoff.updatedAt : now
+  };
+}
+
+function sanitizePlayoffBracket(bracket, kind, enabled) {
+  return {
+    kind,
+    enabled,
+    matches: Array.isArray(bracket?.matches)
+      ? bracket.matches.map((match) => sanitizePlayoffMatch({ ...match, bracket: kind }))
+      : [],
+    championTeamId: typeof bracket?.championTeamId === 'string' ? bracket.championTeamId : null
+  };
+}
+
+function sanitizePlayoffMatch(match) {
+  const format = match?.format ?? {};
+  const setsToWin = clampWholeNumber(format.setsToWin, 1, 3);
+  const maxSets = setsToWin * 2 - 1;
+  const targetScore = clampWholeNumber(format.targetScore, 1, 99);
+  const decidingTargetScore = clampWholeNumber(format.decidingTargetScore, 1, 99);
+  const pointCap = format.pointCap == null ? null : Math.max(targetScore, clampWholeNumber(format.pointCap, 1, 99));
+  const decidingPointCap =
+    pointCap == null || format.decidingPointCap == null
+      ? null
+      : Math.max(decidingTargetScore, clampWholeNumber(format.decidingPointCap, 1, 99));
+  const sourceGames = Array.isArray(match?.games) ? match.games : [];
+  return {
+    id: typeof match?.id === 'string' && match.id.trim() ? match.id.trim() : createId(),
+    bracket: match?.bracket === 'silver' ? 'silver' : 'gold',
+    round: clampWholeNumber(match?.round, 0, 3),
+    position: clampWholeNumber(match?.position, 0, 7),
+    sourceA: sanitizePlayoffSource(match?.sourceA),
+    sourceB: sanitizePlayoffSource(match?.sourceB),
+    teamAId: typeof match?.teamAId === 'string' ? match.teamAId : null,
+    teamBId: typeof match?.teamBId === 'string' ? match.teamBId : null,
+    workTeamId: typeof match?.workTeamId === 'string' ? match.workTeamId : null,
+    workSourceMatchId: typeof match?.workSourceMatchId === 'string' ? match.workSourceMatchId : null,
+    workWinnerSourceMatchId: typeof match?.workWinnerSourceMatchId === 'string' ? match.workWinnerSourceMatchId : null,
+    courtNumber: nullableInteger(match?.courtNumber, 1, 99),
+    format: { setsToWin, targetScore, pointCap, decidingTargetScore, decidingPointCap },
+    games: Array.from({ length: maxSets }, (_, index) => ({
+      scoreA: clampWholeNumber(
+        sourceGames[index]?.scoreA,
+        0,
+        setsToWin > 1 && index === maxSets - 1 ? (decidingPointCap ?? 99) : (pointCap ?? 99)
+      ),
+      scoreB: clampWholeNumber(
+        sourceGames[index]?.scoreB,
+        0,
+        setsToWin > 1 && index === maxSets - 1 ? (decidingPointCap ?? 99) : (pointCap ?? 99)
+      ),
+      final: Boolean(sourceGames[index]?.final)
+    })),
+    final: Boolean(match?.final),
+    winnerTeamId: typeof match?.winnerTeamId === 'string' ? match.winnerTeamId : null,
+    updatedAt: typeof match?.updatedAt === 'string' ? match.updatedAt : null
+  };
+}
+
+function sanitizePlayoffSource(source) {
+  const kinds = new Set(['pool-finish', 'winner', 'team', 'bye']);
+  return {
+    kind: kinds.has(source?.kind) ? source.kind : 'bye',
+    ...(typeof source?.poolId === 'string' ? { poolId: source.poolId } : {}),
+    ...(Number.isInteger(Number(source?.finish)) ? { finish: clampWholeNumber(source.finish, 1, 7) } : {}),
+    ...(typeof source?.matchId === 'string' ? { matchId: source.matchId } : {}),
+    ...(typeof source?.teamId === 'string' ? { teamId: source.teamId } : {}),
+    label: typeof source?.label === 'string' ? source.label : 'TBD'
+  };
+}
+
+function sanitizeFinishList(value, fallback) {
+  const values = Array.isArray(value) ? value : fallback;
+  return [...new Set(values.map((item) => clampWholeNumber(item, 1, 7)))].sort((a, b) => a - b);
+}
+
+function playoffWinner(match) {
+  let winsA = 0;
+  let winsB = 0;
+  for (const game of match.games.filter((candidate) => candidate.final)) {
+    if (game.scoreA > game.scoreB) winsA += 1;
+    if (game.scoreB > game.scoreA) winsB += 1;
+  }
+  if (winsA < match.format.setsToWin && winsB < match.format.setsToWin) return null;
+  return winsA > winsB ? match.teamAId : match.teamBId;
+}
+
+function applyPlayoffAdvancement(playoff, bracket, match) {
+  for (const candidate of bracket.matches) {
+    if (candidate.sourceA?.matchId === match.id) candidate.teamAId = match.winnerTeamId;
+    if (candidate.sourceB?.matchId === match.id) candidate.teamBId = match.winnerTeamId;
+  }
+  const loserTeamId = match.winnerTeamId
+    ? match.winnerTeamId === match.teamAId
+      ? match.teamBId
+      : match.teamAId
+    : null;
+  for (const candidate of [...playoff.gold.matches, ...playoff.silver.matches]) {
+    if (candidate.workSourceMatchId === match.id) candidate.workTeamId = loserTeamId;
+    if (candidate.workWinnerSourceMatchId === match.id) candidate.workTeamId = match.winnerTeamId;
+  }
+  applyPlayedFeederWorkAssignment(playoff, match, loserTeamId);
+  applyGoldSemifinalWorkAssignments(playoff, match, loserTeamId);
+  const maxRound = Math.max(...bracket.matches.map((candidate) => candidate.round), 0);
+  if (match.final && match.round === maxRound) bracket.championTeamId = match.winnerTeamId;
+  if (!match.final && match.round === maxRound) bracket.championTeamId = null;
+}
+
+function applyPlayedFeederWorkAssignment(playoff, match, loserTeamId) {
+  const allMatches = [...playoff.gold.matches, ...playoff.silver.matches];
+  for (const candidate of allMatches) {
+    if (candidate.workWinnerSourceMatchId) continue;
+    const configuredSource = allMatches.find((feeder) => feeder.id === candidate.workSourceMatchId);
+    const configuredSourceIsBye =
+      configuredSource && (configuredSource.sourceA?.kind === 'bye' || configuredSource.sourceB?.kind === 'bye');
+    if (!configuredSourceIsBye) continue;
+    const feederIds = [candidate.sourceA?.matchId, candidate.sourceB?.matchId].filter(Boolean);
+    if (!feederIds.includes(match.id)) continue;
+    const playedFeeder = feederIds
+      .map((id) => allMatches.find((feeder) => feeder.id === id))
+      .find((feeder) => feeder && feeder.sourceA?.kind !== 'bye' && feeder.sourceB?.kind !== 'bye');
+    if (playedFeeder?.id === match.id) candidate.workTeamId = loserTeamId;
+  }
+}
+
+function applyGoldSemifinalWorkAssignments(playoff, match, loserTeamId) {
+  if (match.bracket !== 'gold') return;
+  const goldFinalRound = Math.max(...playoff.gold.matches.map((candidate) => candidate.round), 0);
+  const semifinals = playoff.gold.matches
+    .filter((candidate) => candidate.round === goldFinalRound - 1)
+    .sort((left, right) => left.position - right.position);
+  const semifinalIndex = semifinals.findIndex((candidate) => candidate.id === match.id);
+  if (semifinalIndex < 0) return;
+
+  const goldFinal = playoff.gold.matches.find((candidate) => candidate.round === goldFinalRound);
+  const silverFinalRound = Math.max(...playoff.silver.matches.map((candidate) => candidate.round), 0);
+  const silverFinal = playoff.silver.enabled
+    ? playoff.silver.matches.find((candidate) => candidate.round === silverFinalRound)
+    : null;
+
+  if (semifinalIndex === 0 && goldFinal) goldFinal.workTeamId = loserTeamId;
+  if (semifinalIndex === 1 && silverFinal) silverFinal.workTeamId = loserTeamId;
+}
+
+function validatePlayoffForSave(event, playoff) {
+  const overlap = playoff.goldFinishes.some(
+    (finish) => playoff.silver.enabled && playoff.silverFinishes.includes(finish)
+  );
+  if (overlap) throw httpError(400, 'A pool finish cannot feed both Gold and Silver.', 'ERR_PLAYOFF_FINISH_OVERLAP');
+  for (const bracket of [playoff.gold, playoff.silver].filter((candidate) => candidate.enabled)) {
+    if (bracket.matches.length === 0) {
+      throw httpError(400, `${bracket.kind} needs between two and eight teams.`, 'ERR_PLAYOFF_FIELD_SIZE');
+    }
+  }
+  if (!playoff.published) return;
+  if (playoff.unresolvedTiePoolIds.length) {
+    throw httpError(
+      409,
+      'An admin must manually order unresolved pool ties before publication.',
+      'ERR_PLAYOFF_TIES_UNRESOLVED'
+    );
+  }
+  const pools = event.pools.filter((pool) => pool.category === playoff.category && pool.division === playoff.division);
+  if (!pools.length || pools.some((pool) => !pool.matches.length || pool.matches.some((match) => !match.final))) {
+    throw httpError(
+      409,
+      'Every source pool must be complete before playoffs can be published.',
+      'ERR_PLAYOFF_POOLS_INCOMPLETE'
+    );
+  }
+  const unresolved = [playoff.gold, playoff.silver]
+    .filter((bracket) => bracket.enabled)
+    .flatMap((bracket) => bracket.matches.filter((match) => match.round === 0))
+    .some(
+      (match) => (match.sourceA.kind !== 'bye' && !match.teamAId) || (match.sourceB.kind !== 'bye' && !match.teamBId)
+    );
+  if (unresolved) {
+    throw httpError(409, 'Every opening-round playoff slot must resolve before publication.', 'ERR_PLAYOFF_UNRESOLVED');
+  }
 }
 
 function hasStartedScoring(pool) {
@@ -1107,6 +1398,7 @@ function publicEvent(event) {
   return {
     ...eventWithoutImages,
     pools,
+    playoffs: eventWithoutImages.playoffs.filter((playoff) => playoff.published),
     activePoolId
   };
 }

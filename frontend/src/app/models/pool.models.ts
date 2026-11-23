@@ -1,4 +1,5 @@
 export interface Team {
+  id: string;
   seed: number;
   name: string;
   seededSourceSeed?: number | null;

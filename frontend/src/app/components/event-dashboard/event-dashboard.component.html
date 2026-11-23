@@ -16,6 +16,7 @@
     <button type="button" class="secondary" [class.active]="showingFavoritePools" (click)="favoritesSelected.emit()">
       Favorites ({{ favoritePoolCount }})
     </button>
+    <button type="button" class="secondary" (click)="playoffsSelected.emit()">Playoffs</button>
   </div>
 
   @if (poolCards.length) {

@@ -7,14 +7,15 @@ import {
   defaultTargetScore
 } from '../util/pool-setup-rules';
 import { normalizeDivision } from '../util/division-rules';
-import { clampWholeNumber, seedOrNull, wholeNumber } from '../util/scoring-helpers';
+import { clampWholeNumber, createId, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 
 export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, title: string): PoolState => {
   const teamCount = sheetTeamCount(pool, scan);
   const scannedTeams = new Map(scan.teams.map((team) => [wholeNumber(team.seed), team.name?.trim() || null]));
   const gamesPerMatch = clampWholeNumber(scan.gamesPerMatch ?? pool.gamesPerMatch, 1, 5);
 
-  const targetScore = scan.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(scan.targetScore, 1, 99);
+  const targetScore =
+    scan.targetScore == null ? defaultTargetScore(teamCount) : clampWholeNumber(scan.targetScore, 1, 99);
 
   return {
     ...pool,
@@ -27,6 +28,7 @@ export const applySheetScanToPool = (pool: PoolState, scan: SheetScanResult, tit
     teams: Array.from({ length: teamCount }, (_, index) => {
       const seed = index + 1;
       return {
+        id: pool.teams.find((team) => team.seed === seed)?.id ?? createId(),
         seed,
         name: scannedTeams.get(seed) || pool.teams.find((team) => team.seed === seed)?.name || `Team ${seed}`
       };

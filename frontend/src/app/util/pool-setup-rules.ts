@@ -21,7 +21,7 @@ export const createDefaultPool = (title = 'Pool'): PoolState => ({
   courtNumbers: [],
   nextMatchStartAt: null,
   nextMatchStartSourceMatchId: null,
-  teams: [1, 2, 3, 4].map((seed) => ({ seed, name: `Team ${seed}` })),
+  teams: [1, 2, 3, 4].map((seed) => ({ id: createId(), seed, name: `Team ${seed}` })),
   matches: createTemplateMatches(4, 2),
   seededPoolSource: null,
   imagePreview: null,

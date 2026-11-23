@@ -1,0 +1,174 @@
+<span hidden>{{ scoring.version() }}</span>
+@if (playoff; as config) {
+  <section class="setup-panel playoff-setup">
+    <div class="section-title">
+      <div>
+        <p>Admin setup</p>
+        <h2>{{ config.category }} {{ config.division }} playoffs</h2>
+      </div>
+      <button type="button" (click)="scoring.savePlayoff()">Save playoffs</button>
+    </div>
+
+    <div class="setup-fields">
+      <label
+        >Category
+        <select [(ngModel)]="config.category" (ngModelChange)="regenerate()">
+          @for (category of scoring.categoryOptions; track category) {
+            <option [ngValue]="category">{{ category }}</option>
+          }
+        </select>
+      </label>
+      <label
+        >Division
+        <select [(ngModel)]="config.division" (ngModelChange)="regenerate()">
+          @for (division of scoring.divisionOptions; track division) {
+            <option [ngValue]="division">{{ division }}</option>
+          }
+        </select>
+      </label>
+      <label class="checkbox"
+        ><input type="checkbox" [(ngModel)]="config.reseed" (ngModelChange)="regenerate()" /> Reseed across pools</label
+      >
+      <label class="checkbox"
+        ><input type="checkbox" [(ngModel)]="config.silver.enabled" (ngModelChange)="regenerate()" /> Silver
+        bracket</label
+      >
+      <label class="checkbox"><input type="checkbox" [(ngModel)]="config.published" /> Published</label>
+      <label class="checkbox"><input type="checkbox" [(ngModel)]="config.editable" /> Scoring open</label>
+    </div>
+
+    <div class="advancement-grid">
+      @for (kind of ['gold', 'silver']; track kind) {
+        @if (kind === 'gold' || config.silver.enabled) {
+          <fieldset>
+            <legend>{{ kind === 'gold' ? 'Gold' : 'Silver' }} pool finishes</legend>
+            @for (finish of finishes; track finish) {
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  [checked]="(kind === 'gold' ? config.goldFinishes : config.silverFinishes).includes(finish)"
+                  (change)="toggleFinish($any(kind), finish, $any($event.target).checked)"
+                />
+                {{ finish }}
+              </label>
+            }
+          </fieldset>
+        }
+      }
+    </div>
+
+    @if (config.unresolvedTiePoolIds.length) {
+      <aside class="setup-panel seeded-errors">
+        <strong>Manual tie order required</strong>
+        <p>Use the opening-round team selectors below to place the tied teams, then confirm the order.</p>
+        <button type="button" class="secondary" (click)="config.unresolvedTiePoolIds = []">
+          I have manually ordered tied teams
+        </button>
+      </aside>
+    }
+
+    @for (bracket of [config.gold, config.silver]; track bracket.kind) {
+      @if (bracket.enabled) {
+        <section class="bracket-settings">
+          <h3>{{ bracket.kind === 'gold' ? 'Gold' : 'Silver' }} format</h3>
+          @for (round of rounds(bracket); track round) {
+            @if (roundMatch(bracket, round); as match) {
+              <fieldset class="round-format">
+                <legend>{{ round === rounds(bracket).length - 1 ? 'Final' : 'Round ' + (round + 1) }}</legend>
+                <label
+                  >Sets to win
+                  <input
+                    type="number"
+                    min="1"
+                    max="3"
+                    [(ngModel)]="match.format.setsToWin"
+                    (ngModelChange)="applyRoundFormat(bracket, round, match)"
+                /></label>
+                <label
+                  >Set target
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    [(ngModel)]="match.format.targetScore"
+                    (ngModelChange)="applyRoundFormat(bracket, round, match)"
+                /></label>
+                <label
+                  >Set cap
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    [(ngModel)]="match.format.pointCap"
+                    (ngModelChange)="applyRoundFormat(bracket, round, match)"
+                /></label>
+                <label
+                  >Deciding target
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    [(ngModel)]="match.format.decidingTargetScore"
+                    (ngModelChange)="applyRoundFormat(bracket, round, match)"
+                /></label>
+                <label
+                  >Deciding cap
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    [(ngModel)]="match.format.decidingPointCap"
+                    (ngModelChange)="applyRoundFormat(bracket, round, match)"
+                    [disabled]="match.format.pointCap === null"
+                /></label>
+              </fieldset>
+            }
+          }
+          <div class="match-assignments">
+            @for (match of bracket.matches; track match.id) {
+              <div>
+                <strong>R{{ match.round + 1 }} M{{ match.position + 1 }}</strong>
+                @if (match.round === 0) {
+                  <label
+                    >Team A
+                    <select [(ngModel)]="match.teamAId">
+                      <option [ngValue]="null">{{ match.sourceA.label }}</option>
+                      @for (pool of scoring.playoffPools(config.category, config.division); track pool.id) {
+                        @for (team of pool.teams; track team.id) {
+                          <option [ngValue]="team.id">{{ team.name }}</option>
+                        }
+                      }
+                    </select>
+                  </label>
+                  <label
+                    >Team B
+                    <select [(ngModel)]="match.teamBId">
+                      <option [ngValue]="null">{{ match.sourceB.label }}</option>
+                      @for (pool of scoring.playoffPools(config.category, config.division); track pool.id) {
+                        @for (team of pool.teams; track team.id) {
+                          <option [ngValue]="team.id">{{ team.name }}</option>
+                        }
+                      }
+                    </select>
+                  </label>
+                }
+                <label>Court <input type="number" min="1" max="99" [(ngModel)]="match.courtNumber" /></label>
+                <label
+                  >Work team
+                  <select [(ngModel)]="match.workTeamId">
+                    <option [ngValue]="null">{{ workPlaceholder(config, match) }}</option>
+                    @for (pool of scoring.playoffPools(config.category, config.division); track pool.id) {
+                      @for (team of pool.teams; track team.id) {
+                        <option [ngValue]="team.id">{{ team.name }}</option>
+                      }
+                    }
+                  </select>
+                </label>
+              </div>
+            }
+          </div>
+        </section>
+      }
+    }
+  </section>
+}

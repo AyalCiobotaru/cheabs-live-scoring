@@ -30,12 +30,16 @@ export class SideMenuComponent {
 
   @Output() poolsSelected = new EventEmitter<void>();
   @Output() favoritesSelected = new EventEmitter<void>();
+  @Output() playoffsSelected = new EventEmitter<void>();
+  @Output() divisionPlayoffsSelected = new EventEmitter<{ category: string; division: string }>();
   @Output() chooseEventSelected = new EventEmitter<void>();
   @Output() adminSelected = new EventEmitter<void>();
   @Output() adminSignOutSelected = new EventEmitter<void>();
   @Output() divisionSelected = new EventEmitter<{ category: string; division: string | null } | null>();
 
   menuOpen = false;
+  collapsedCategories = new Set<string>();
+  expandedDivisions = new Set<string>();
 
   toggleMenu(): void {
     this.menuOpen = !this.menuOpen;
@@ -52,6 +56,11 @@ export class SideMenuComponent {
 
   selectFavorites(): void {
     this.favoritesSelected.emit();
+    this.closeMenu();
+  }
+
+  selectPlayoffs(): void {
+    this.playoffsSelected.emit();
     this.closeMenu();
   }
 
@@ -72,6 +81,26 @@ export class SideMenuComponent {
 
   selectDivision(category: string, division: string | null): void {
     this.divisionSelected.emit({ category, division });
+    this.closeMenu();
+  }
+
+  toggleCategory(category: string): void {
+    const next = new Set(this.collapsedCategories);
+    if (next.has(category)) next.delete(category);
+    else next.add(category);
+    this.collapsedCategories = next;
+  }
+
+  toggleDivision(category: string, division: string): void {
+    const key = `${category}:${division}`;
+    const next = new Set(this.expandedDivisions);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    this.expandedDivisions = next;
+  }
+
+  selectDivisionPlayoffs(category: string, division: string): void {
+    this.divisionPlayoffsSelected.emit({ category, division });
     this.closeMenu();
   }
 }
