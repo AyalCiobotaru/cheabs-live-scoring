@@ -31,6 +31,26 @@ export const routes: Routes = [
           )
       },
       {
+        path: 'playoffs',
+        loadComponent: () =>
+          import('./routes/playoffs-page/playoffs-page.component').then((module) => module.PlayoffsPageComponent)
+      },
+      {
+        path: 'playoffs/:playoffId',
+        loadComponent: () =>
+          import('./routes/playoff-view-page/playoff-view-page.component').then(
+            (module) => module.PlayoffViewPageComponent
+          )
+      },
+      {
+        path: 'playoffs/:playoffId/setup',
+        canActivate: [adminSetupGuard],
+        loadComponent: () =>
+          import('./routes/playoff-setup-page/playoff-setup-page.component').then(
+            (module) => module.PlayoffSetupPageComponent
+          )
+      },
+      {
         path: 'new-pool',
         canActivate: [adminSetupGuard],
         loadComponent: () =>

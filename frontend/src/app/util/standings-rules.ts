@@ -6,12 +6,37 @@ export const buildStandings = (pool: PoolState): TeamStanding[] => {
 
   for (const team of pool.teams) {
     standings.set(team.seed, {
+      teamId: team.id,
       seed: team.seed,
       name: team.name,
       wins: 0,
       losses: 0,
-      pointDifferential: 0
+      pointDifferential: 0,
+      pointPercentage: 0
     });
+  }
+
+  const pointsFor = new Map<number, number>();
+  const pointsTotal = new Map<number, number>();
+
+  for (const match of pool.matches) {
+    if (match.teamASeed == null || match.teamBSeed == null) {
+      continue;
+    }
+
+    for (const game of match.games.filter((candidate) => candidate.final)) {
+      const scoreA = wholeNumber(game.scoreA);
+      const scoreB = wholeNumber(game.scoreB);
+      pointsFor.set(match.teamASeed, (pointsFor.get(match.teamASeed) ?? 0) + scoreA);
+      pointsFor.set(match.teamBSeed, (pointsFor.get(match.teamBSeed) ?? 0) + scoreB);
+      pointsTotal.set(match.teamASeed, (pointsTotal.get(match.teamASeed) ?? 0) + scoreA + scoreB);
+      pointsTotal.set(match.teamBSeed, (pointsTotal.get(match.teamBSeed) ?? 0) + scoreA + scoreB);
+    }
+  }
+
+  for (const standing of standings.values()) {
+    const total = pointsTotal.get(standing.seed) ?? 0;
+    standing.pointPercentage = total > 0 ? (pointsFor.get(standing.seed) ?? 0) / total : 0;
   }
 
   for (const match of pool.matches) {
@@ -54,8 +79,8 @@ export const buildStandings = (pool: PoolState): TeamStanding[] => {
   return [...standings.values()].sort((left, right) => {
     return (
       right.wins - left.wins ||
-      right.pointDifferential - left.pointDifferential ||
       headToHeadWins(pool, right.seed, left.seed) - headToHeadWins(pool, left.seed, right.seed) ||
+      right.pointPercentage - left.pointPercentage ||
       left.seed - right.seed
     );
   });

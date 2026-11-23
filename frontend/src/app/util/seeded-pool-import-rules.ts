@@ -73,9 +73,7 @@ export const buildSeededPools = (
     category,
     division,
     teams: seededTeams.map(({ seed, name }) => ({ seed, name })),
-    formats: Object.fromEntries(
-      ([4, 5, 6, 7] as const).map((size) => [String(size), normalizeFormat(formats[size])])
-    ),
+    formats: Object.fromEntries(([4, 5, 6, 7] as const).map((size) => [String(size), normalizeFormat(formats[size])])),
     prioritizeFiveTeamPools,
     matchStartTimerMinutes: normalizedMatchStartTimerMinutes,
     courtNumbers: [...courtNumbers],
@@ -106,6 +104,7 @@ export const buildSeededPools = (
       nextMatchStartAt: null,
       nextMatchStartSourceMatchId: null,
       teams: seeds.map((sourceSeed, teamIndex) => ({
+        id: createId(),
         seed: teamIndex + 1,
         name: teamsBySeed.get(sourceSeed)?.name ?? `Team ${sourceSeed}`,
         seededSourceSeed: sourceSeed
@@ -196,7 +195,7 @@ const parseSeededTeams = (
 
     seenSeeds.add(seed);
     seenNames.add(normalizedName);
-    teams.push({ seed, name, lineNumber, normalizedName });
+    teams.push({ id: createId(), seed, name, lineNumber, normalizedName });
     inferredSeed += 1;
   }
 

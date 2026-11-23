@@ -1,0 +1,32 @@
+<span hidden>{{ scoring.version() }}</span>
+<section class="event-dashboard">
+  <div class="event-title">
+    <div>
+      <p>{{ scoring.event?.name }}</p>
+      <h2>Playoffs</h2>
+    </div>
+    @if (scoring.isAdmin) {
+      <button type="button" (click)="scoring.startPlayoffSetup()">Add playoffs</button>
+    }
+  </div>
+
+  @if (playoffs.length) {
+    <div class="pool-grid">
+      @for (playoff of playoffs; track playoff.id) {
+        <article class="pool-card" role="button" tabindex="0" (click)="scoring.openPlayoff(playoff.id)">
+          <div class="pool-card-heading">
+            <h3>{{ playoff.category }} {{ playoff.division }}</h3>
+            <span class="pool-hidden-badge">{{ playoff.published ? 'Published' : 'Draft' }}</span>
+          </div>
+          <p>Gold{{ playoff.silver.enabled ? ' and Silver' : '' }} brackets</p>
+          <p>{{ playoff.editable ? 'Scoring open' : 'Scoring locked' }}</p>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="setup-panel">
+      <h3>Playoffs are not published yet</h3>
+      <p class="empty-copy">Check back after pool play is complete.</p>
+    </div>
+  }
+</section>

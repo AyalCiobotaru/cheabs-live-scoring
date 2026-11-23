@@ -127,11 +127,26 @@
   border: 0;
   border-radius: 0;
   border-top: 1px solid #e3e9f1;
-  padding-left: 22px;
+  padding-left: 12px;
 }
 
-.division-dropdown .division-child {
-  padding-left: 38px;
+.division-dropdown .menu-tree-row.division-child .division-item {
+  padding-left: 28px;
+}
+
+.menu-tree-row {
+  align-items: stretch;
+  display: flex;
+}
+.menu-tree-row .division-item {
+  flex: 1 1 auto;
+}
+.tree-toggle {
+  flex: 0 0 38px;
+  padding: 4px;
+}
+.tree-leaf {
+  padding-left: 48px !important;
 }
 
 .division-item small {

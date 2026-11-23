@@ -9,6 +9,8 @@ import {
   EventState,
   GameScore,
   Match,
+  PlayoffConfiguration,
+  PlayoffMatch,
   PoolCard,
   PoolTimerUpdate,
   SeededPoolSource,
@@ -40,6 +42,7 @@ import { SCHEDULE_PRESETS } from '../util/schedule-presets';
 import type { SchedulePreset } from '../util/schedule-presets';
 import { clampWholeNumber, createId, resizeGamesForCount, seedOrNull, wholeNumber } from '../util/scoring-helpers';
 import { buildPoolCard, buildStandings, teamName } from '../util/standings-rules';
+import { createPlayoffConfiguration, regeneratePlayoffConfiguration } from '../util/playoff-rules';
 import { applySheetScanToPool, buildScanSummary } from './sheet-scan-mapper';
 import { SheetScannerService } from './sheet-scanner.service';
 import { ScoringRealtimeService } from './scoring-realtime.service';
@@ -66,6 +69,7 @@ export class ScoringEventStateService {
   private sideSwitchToastTimeout: number | null = null;
   private lastSideSwitchKey: string | null = null;
   private pendingAdminRoute: string | null = null;
+  private readonly playoffWriteQueues = new Map<string, Promise<void>>();
 
   readonly version = signal(0);
   readonly teamCountOptions = TEAM_COUNT_OPTIONS;
@@ -95,6 +99,7 @@ export class ScoringEventStateService {
   selectedDivision: string | null = null;
   showingFavoritePools = false;
   favoritePoolIds = new Set<string>();
+  draftPlayoff: PlayoffConfiguration | null = null;
 
   constructor(
     private readonly zone: NgZone,
@@ -450,6 +455,123 @@ export class ScoringEventStateService {
     this.selectedDivision = null;
     void this.router.navigate(['/events', this.event.code]);
     this.bump();
+  }
+
+  openPlayoffs(category?: string, division?: string): void {
+    if (this.event)
+      void this.router.navigate(['/events', this.event.code, 'playoffs'], {
+        queryParams: category && division ? { category, division } : {}
+      });
+  }
+
+  openPlayoff(playoffId: string): void {
+    if (this.event) void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId]);
+  }
+
+  startPlayoffSetup(category?: string, division?: string): void {
+    if (!this.event || !this.isAdmin) return;
+    const selectedCategory = normalizePoolCategory(category ?? this.selectedCategory ?? this.categoryOptions[0]);
+    const selectedDivision = normalizeDivision(division ?? this.selectedDivision ?? this.divisionOptions[0]);
+    const pools = this.playoffPools(selectedCategory, selectedDivision);
+    this.draftPlayoff = createPlayoffConfiguration(selectedCategory, selectedDivision, pools);
+    void this.router.navigate(['/events', this.event.code, 'playoffs', this.draftPlayoff.id, 'setup']);
+  }
+
+  editPlayoff(playoffId: string): void {
+    if (!this.event || !this.isAdmin) return;
+    const playoff = this.event.playoffs.find((candidate) => candidate.id === playoffId);
+    if (!playoff) return;
+    this.draftPlayoff = this.clonePlayoff(playoff);
+    void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId, 'setup']);
+  }
+
+  regenerateDraftPlayoff(): void {
+    if (!this.draftPlayoff) return;
+    this.draftPlayoff = regeneratePlayoffConfiguration(
+      this.draftPlayoff,
+      this.playoffPools(this.draftPlayoff.category, this.draftPlayoff.division)
+    );
+    this.bump();
+  }
+
+  async savePlayoff(): Promise<void> {
+    if (!this.event || !this.draftPlayoff || !this.isAdmin) return;
+    this.eventError = '';
+    const response = await fetch(`/api/scoring/events/${this.event.code}/playoffs/${this.draftPlayoff.id}`, {
+      method: 'PUT',
+      headers: this.adminHeaders(),
+      body: JSON.stringify({ playoff: this.draftPlayoff })
+    });
+    if (!response.ok) {
+      this.eventError = await this.errorMessage(response);
+      this.bump();
+      return;
+    }
+    const body = (await response.json()) as { event: EventState };
+    this.event = this.normalizeEvent(body.event);
+    const id = this.draftPlayoff.id;
+    this.draftPlayoff = null;
+    this.persistLocal();
+    await this.router.navigate(['/events', this.event.code, 'playoffs', id]);
+    this.bump();
+  }
+
+  async deletePlayoff(playoffId: string): Promise<void> {
+    if (!this.event || !this.isAdmin || !confirm('Delete this playoff configuration and all playoff scores?')) return;
+    const response = await fetch(`/api/scoring/events/${this.event.code}/playoffs/${playoffId}`, {
+      method: 'DELETE',
+      headers: this.adminHeaders()
+    });
+    if (!response.ok) {
+      this.eventError = await this.errorMessage(response);
+      this.bump();
+      return;
+    }
+    this.event.playoffs = this.event.playoffs.filter((candidate) => candidate.id !== playoffId);
+    await this.router.navigate(['/events', this.event.code, 'playoffs']);
+    this.bump();
+  }
+
+  async handlePlayoffMatchChanged(playoffId: string, match: PlayoffMatch): Promise<void> {
+    const key = `${playoffId}:${match.id}`;
+    const payload = JSON.parse(JSON.stringify(match)) as PlayoffMatch;
+    const previous = this.playoffWriteQueues.get(key) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.persistPlayoffMatch(playoffId, payload));
+    this.playoffWriteQueues.set(key, next);
+    await next.finally(() => {
+      if (this.playoffWriteQueues.get(key) === next) this.playoffWriteQueues.delete(key);
+    });
+  }
+
+  private async persistPlayoffMatch(playoffId: string, match: PlayoffMatch): Promise<void> {
+    if (!this.event) return;
+    const playoff = this.event.playoffs.find((candidate) => candidate.id === playoffId);
+    if (!playoff) return;
+    const response = await fetch(`/api/scoring/events/${this.event.code}/playoffs/${playoffId}/matches/${match.id}`, {
+      method: 'PUT',
+      headers:
+        this.isAdmin && (!playoff.published || !playoff.editable)
+          ? this.adminHeaders()
+          : { 'content-type': 'application/json' },
+      body: JSON.stringify({ match })
+    });
+    if (!response.ok) {
+      this.eventError = await this.errorMessage(response);
+      this.bump();
+      return;
+    }
+    const body = (await response.json()) as { event: EventState };
+    this.event = this.normalizeEvent(body.event);
+    this.persistLocal();
+    this.bump();
+  }
+
+  playoffPools(category: string, division: string): PoolState[] {
+    return (
+      this.event?.pools.filter(
+        (pool) => normalizePoolCategory(pool.category) === category && normalizeDivision(pool.division) === division
+      ) ?? []
+    );
   }
 
   openPool(poolId: string): void {
@@ -965,7 +1087,7 @@ export class ScoringEventStateService {
     pool.teamCount = count;
     pool.teams = Array.from({ length: count }, (_, index) => {
       const seed = index + 1;
-      return pool.teams.find((team) => team.seed === seed) ?? { seed, name: `Team ${seed}` };
+      return pool.teams.find((team) => team.seed === seed) ?? { id: createId(), seed, name: `Team ${seed}` };
     });
     pool.matches = createTemplateMatches(count, pool.gamesPerMatch, pool.courtNumbers);
     pool.targetScore = defaultTargetScore(count);
@@ -1402,6 +1524,7 @@ export class ScoringEventStateService {
       ...local,
       name: remote.name || local.name,
       pools: mergedPools,
+      playoffs: this.isAdmin ? this.mergePlayoffs(local.playoffs, remote.playoffs) : remote.playoffs,
       activePoolId: mergedPools.some((pool) => pool.id === activePoolId) ? activePoolId : (mergedPools[0]?.id ?? null),
       updatedAt: this.isNewer(remote.updatedAt, local.updatedAt) ? remote.updatedAt : local.updatedAt
     };
@@ -1436,10 +1559,14 @@ export class ScoringEventStateService {
         ? event.activePoolId
         : (pools[0]?.id ?? null);
 
+    const normalizedPlayoffs = Array.isArray(event.playoffs)
+      ? event.playoffs.map((playoff) => this.clonePlayoff(playoff))
+      : [];
     return {
       code: this.normalizeEventCode(event.code),
       name: typeof event.name === 'string' && event.name.trim() ? event.name.trim() : event.code,
       pools,
+      playoffs: this.isAdmin ? normalizedPlayoffs : normalizedPlayoffs.filter((playoff) => playoff.published),
       activePoolId,
       updatedAt: typeof event.updatedAt === 'string' ? event.updatedAt : null
     };
@@ -1466,6 +1593,7 @@ export class ScoringEventStateService {
       const team = sourceTeams.find((candidate) => candidate.seed === seed);
 
       return {
+        id: typeof team?.id === 'string' && team.id.trim() ? team.id : `${pool.id}-team-${seed}`,
         seed,
         name: typeof team?.name === 'string' && team.name.trim() ? team.name : `Team ${seed}`,
         seededSourceSeed: this.seededSourceSeedOrNull(team?.seededSourceSeed)
@@ -1771,6 +1899,19 @@ export class ScoringEventStateService {
 
   private clonePool(pool: PoolState): PoolState {
     return JSON.parse(JSON.stringify(pool)) as PoolState;
+  }
+
+  private clonePlayoff(playoff: PlayoffConfiguration): PlayoffConfiguration {
+    return JSON.parse(JSON.stringify(playoff)) as PlayoffConfiguration;
+  }
+
+  private mergePlayoffs(local: PlayoffConfiguration[], remote: PlayoffConfiguration[]): PlayoffConfiguration[] {
+    const merged = new Map(local.map((playoff) => [playoff.id, playoff]));
+    for (const playoff of remote) {
+      const current = merged.get(playoff.id);
+      if (!current || this.isNewer(playoff.updatedAt, current.updatedAt)) merged.set(playoff.id, playoff);
+    }
+    return [...merged.values()];
   }
 
   private cloneSeededPoolSource(source: SeededPoolSource): SeededPoolSource {

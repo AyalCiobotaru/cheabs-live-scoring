@@ -20,6 +20,7 @@ export class EventDashboardComponent {
   @Output() addPool = new EventEmitter<void>();
   @Output() allPoolsSelected = new EventEmitter<void>();
   @Output() favoritesSelected = new EventEmitter<void>();
+  @Output() playoffsSelected = new EventEmitter<void>();
   @Output() poolFavoriteToggled = new EventEmitter<string>();
   @Output() poolSelected = new EventEmitter<string>();
   @Output() timerSelected = new EventEmitter<string>();

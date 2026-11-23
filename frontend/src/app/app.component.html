@@ -12,6 +12,8 @@
         [divisionOptions]="scoring.divisionFilterOptions"
         (poolsSelected)="scoring.openDashboard()"
         (favoritesSelected)="scoring.openFavoritePools()"
+        (playoffsSelected)="scoring.openPlayoffs()"
+        (divisionPlayoffsSelected)="scoring.openPlayoffs($event.category, $event.division)"
         (chooseEventSelected)="scoring.chooseEvent()"
         (adminSelected)="scoring.showingAdminSignIn = !scoring.showingAdminSignIn"
         (adminSignOutSelected)="scoring.adminSignOut()"

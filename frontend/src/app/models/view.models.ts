@@ -1,11 +1,13 @@
 import { PoolState } from './pool.models';
 
 export interface TeamStanding {
+  teamId: string;
   seed: number;
   name: string;
   wins: number;
   losses: number;
   pointDifferential: number;
+  pointPercentage: number;
 }
 
 export interface PoolCard {
