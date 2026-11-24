@@ -2,13 +2,23 @@
 <section class="event-dashboard">
   <div class="event-title">
     <div>
-      <p>{{ scoring.event?.name }}</p>
-      <h2>Playoffs</h2>
+      <p>Event {{ scoring.event?.code }}</p>
+      <h2>{{ scoring.event?.name }}</h2>
     </div>
     @if (scoring.isAdmin) {
       <button type="button" (click)="scoring.startPlayoffSetup()">Add playoffs</button>
     }
   </div>
+
+  <div class="dashboard-view-toggle">
+    <button type="button" class="secondary" (click)="scoring.openDashboard()">All pools</button>
+    <button type="button" class="secondary" (click)="scoring.openFavoritePools()">
+      Favorites ({{ scoring.favoritePoolCount }})
+    </button>
+    <button type="button" class="secondary active" (click)="scoring.openPlayoffs()">Playoffs</button>
+  </div>
+
+  <h2>Playoffs</h2>
 
   @if (playoffs.length) {
     <div class="pool-grid">

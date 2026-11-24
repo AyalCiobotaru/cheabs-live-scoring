@@ -301,7 +301,8 @@ export class ScoringEventStateService {
 
     try {
       const response = await fetch(`/api/scoring/events/${code}`, {
-        headers: this.isAdmin ? this.adminHeaders() : undefined
+        headers: this.isAdmin ? this.adminHeaders() : undefined,
+        cache: 'no-store'
       });
 
       if (!response.ok) {
@@ -527,7 +528,13 @@ export class ScoringEventStateService {
       this.bump();
       return;
     }
-    this.event.playoffs = this.event.playoffs.filter((candidate) => candidate.id !== playoffId);
+    const body = (await response.json()) as { event: EventState };
+    this.event = this.normalizeEvent(body.event);
+    if (this.draftPlayoff?.id === playoffId) this.draftPlayoff = null;
+    for (const key of this.playoffWriteQueues.keys()) {
+      if (key.startsWith(`${playoffId}:`)) this.playoffWriteQueues.delete(key);
+    }
+    this.persistLocal();
     await this.router.navigate(['/events', this.event.code, 'playoffs']);
     this.bump();
   }
@@ -1307,6 +1314,7 @@ export class ScoringEventStateService {
       const response = await fetch(create ? '/api/scoring/events' : `/api/scoring/events/${code}`, {
         method: create ? 'POST' : 'GET',
         headers: create ? this.adminHeaders() : undefined,
+        cache: create ? undefined : 'no-store',
         body: create ? JSON.stringify({ code, name: this.eventName.trim() || code }) : undefined
       });
 
@@ -1499,6 +1507,7 @@ export class ScoringEventStateService {
   }
 
   private mergeEvents(local: EventState, remote: EventState): EventState {
+    const remoteIsNewer = this.isNewer(remote.updatedAt, local.updatedAt);
     const pools = new Map<string, PoolState>();
 
     for (const pool of local.pools) {
@@ -1524,7 +1533,11 @@ export class ScoringEventStateService {
       ...local,
       name: remote.name || local.name,
       pools: mergedPools,
-      playoffs: this.isAdmin ? this.mergePlayoffs(local.playoffs, remote.playoffs) : remote.playoffs,
+      playoffs: this.isAdmin
+        ? remoteIsNewer
+          ? this.mergePlayoffs(local.playoffs, remote.playoffs)
+          : local.playoffs
+        : remote.playoffs,
       activePoolId: mergedPools.some((pool) => pool.id === activePoolId) ? activePoolId : (mergedPools[0]?.id ?? null),
       updatedAt: this.isNewer(remote.updatedAt, local.updatedAt) ? remote.updatedAt : local.updatedAt
     };

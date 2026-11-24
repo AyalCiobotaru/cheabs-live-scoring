@@ -3,16 +3,28 @@
   <section class="event-dashboard playoff-page">
     <div class="event-title">
       <div>
-        <p>{{ config.category }} · {{ config.division }}</p>
-        <h2>Playoffs</h2>
+        <p>Event {{ scoring.event?.code }}</p>
+        <h2>{{ scoring.event?.name }}</h2>
       </div>
       <div class="header-actions">
-        <button type="button" class="secondary playoff-back" (click)="scoring.openDashboard()">Back</button>
         @if (scoring.isAdmin) {
           <button type="button" class="secondary" (click)="scoring.editPlayoff(config.id)">Edit setup</button>
           <button type="button" class="danger" (click)="scoring.deletePlayoff(config.id)">Delete</button>
         }
       </div>
+    </div>
+
+    <div class="dashboard-view-toggle">
+      <button type="button" class="secondary" (click)="scoring.openDashboard()">All pools</button>
+      <button type="button" class="secondary" (click)="scoring.openFavoritePools()">
+        Favorites ({{ scoring.favoritePoolCount }})
+      </button>
+      <button type="button" class="secondary active" (click)="scoring.openPlayoffs()">Playoffs</button>
+    </div>
+
+    <div class="playoff-stage-title">
+      <p>{{ config.category }} · {{ config.division }}</p>
+      <h2>Playoffs</h2>
     </div>
 
     @for (bracket of [config.gold, config.silver]; track bracket.kind) {
@@ -21,7 +33,10 @@
           <div class="section-title">
             <h3>{{ bracket.kind === 'gold' ? 'Gold' : 'Silver' }}</h3>
             @if (bracket.championTeamId) {
-              <strong>Champion: {{ teamName(bracket.championTeamId) }}</strong>
+              <div class="playoff-champion" [class.silver]="bracket.kind === 'silver'">
+                <span>Champion</span>
+                <strong>{{ teamName(bracket.championTeamId) }}</strong>
+              </div>
             }
           </div>
           @if (rounds(bracket).length > 1) {
@@ -60,84 +75,107 @@
                         <span>Court {{ match.courtNumber }}</span>
                       }
                     </div>
-                    @if (match.teamAId && match.teamBId) {
-                      <div class="playoff-games">
-                        @for (game of match.games; track $index; let gameIndex = $index) {
-                          @if (canShowSet(match, gameIndex)) {
-                            <section class="playoff-game">
-                              <div class="playoff-set-heading">
-                                <h5>Set {{ gameIndex + 1 }}</h5>
-                                @if (game.final && scoring.isAdmin) {
-                                  <button
-                                    type="button"
-                                    class="secondary"
-                                    (click)="reopenSet(match, gameIndex)"
-                                    [disabled]="match.final"
-                                    [title]="match.final ? 'Reopen the match before reopening a set.' : 'Reopen set'"
-                                  >
-                                    Reopen set
-                                  </button>
-                                }
-                              </div>
-                              <div class="playoff-score-team">
-                                <span>{{ teamName(match.teamAId) }}</span>
+                    <div class="playoff-score-grid" [style.--set-count]="match.games.length">
+                        <div class="playoff-score-header">
+                          <span>Team</span>
+                          @for (game of match.games; track $index) {
+                            <span>Set {{ $index + 1 }}</span>
+                          }
+                        </div>
+                        <div class="playoff-score-row">
+                          <span class="playoff-team-name" [class.winner]="isWinner(match, match.teamAId)">
+                            {{ slotName(match, 'A') }}
+                          </span>
+                          @for (game of match.games; track $index; let gameIndex = $index) {
+                            @if (canShowSet(match, gameIndex)) {
+                              <div class="playoff-score-cell">
                                 <input
                                   type="number"
                                   min="0"
                                   [max]="scoreCap(match, gameIndex)"
-                                  [attr.aria-label]="teamName(match.teamAId) + ' score for set ' + (gameIndex + 1)"
+                                  [attr.aria-label]="slotName(match, 'A') + ' score for set ' + (gameIndex + 1)"
                                   [ngModel]="game.scoreA"
                                   (wheel)="disableScoreWheel($event)"
                                   (ngModelChange)="setScore(match, gameIndex, 'A', $event)"
-                                  [disabled]="!canScore() || game.final"
+                                  [disabled]="!canScoreMatch(match) || match.final || game.final"
                                 />
                                 <div class="score-buttons">
                                   <button
                                     type="button"
                                     (click)="updateScore(match, gameIndex, 'A', -1)"
-                                    [disabled]="!canScore() || game.final"
+                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
                                   >
                                     −
                                   </button>
                                   <button
                                     type="button"
                                     (click)="updateScore(match, gameIndex, 'A', 1)"
-                                    [disabled]="!canScore() || game.final"
+                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
                                   >
                                     +
                                   </button>
                                 </div>
                               </div>
-                              <div class="playoff-score-team">
-                                <span>{{ teamName(match.teamBId) }}</span>
+                            } @else {
+                              <span class="playoff-score-cell pending">—</span>
+                            }
+                          }
+                        </div>
+                        <div class="playoff-score-row">
+                          <span class="playoff-team-name" [class.winner]="isWinner(match, match.teamBId)">
+                            {{ slotName(match, 'B') }}
+                          </span>
+                          @for (game of match.games; track $index; let gameIndex = $index) {
+                            @if (canShowSet(match, gameIndex)) {
+                              <div class="playoff-score-cell">
                                 <input
                                   type="number"
                                   min="0"
                                   [max]="scoreCap(match, gameIndex)"
-                                  [attr.aria-label]="teamName(match.teamBId) + ' score for set ' + (gameIndex + 1)"
+                                  [attr.aria-label]="slotName(match, 'B') + ' score for set ' + (gameIndex + 1)"
                                   [ngModel]="game.scoreB"
                                   (wheel)="disableScoreWheel($event)"
                                   (ngModelChange)="setScore(match, gameIndex, 'B', $event)"
-                                  [disabled]="!canScore() || game.final"
+                                  [disabled]="!canScoreMatch(match) || match.final || game.final"
                                 />
                                 <div class="score-buttons">
                                   <button
                                     type="button"
                                     (click)="updateScore(match, gameIndex, 'B', -1)"
-                                    [disabled]="!canScore() || game.final"
+                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
                                   >
                                     −
                                   </button>
                                   <button
                                     type="button"
                                     (click)="updateScore(match, gameIndex, 'B', 1)"
-                                    [disabled]="!canScore() || game.final"
+                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
                                   >
                                     +
                                   </button>
                                 </div>
                               </div>
-                              @if (!game.final) {
+                            } @else {
+                              <span class="playoff-score-cell pending">—</span>
+                            }
+                          }
+                        </div>
+                        @if (!match.final) {
+                          <div class="playoff-set-actions">
+                          <span></span>
+                          @for (game of match.games; track $index; let gameIndex = $index) {
+                            @if (canShowSet(match, gameIndex)) {
+                              @if (game.final && scoring.isAdmin) {
+                                <button
+                                  type="button"
+                                  class="secondary"
+                                  (click)="reopenSet(match, gameIndex)"
+                                  [disabled]="match.final"
+                                  [title]="match.final ? 'Reopen the match before reopening a set.' : 'Reopen set'"
+                                >
+                                  Reopen
+                                </button>
+                              } @else if (!game.final) {
                                 <button
                                   type="button"
                                   class="secondary"
@@ -147,13 +185,17 @@
                                   Set final
                                 </button>
                               }
-                            </section>
+                            } @else {
+                              <span></span>
+                            }
                           }
+                          </div>
                         }
-                      </div>
-                      <div class="row-actions">
+                    </div>
+                    <div class="row-actions playoff-match-actions">
                         @if (match.final) {
-                          @if (scoring.isAdmin) {
+                          <strong class="match-final-badge">Final</strong>
+                          @if (scoring.isAdmin && !isByeMatch(match)) {
                             <button type="button" class="secondary" (click)="reopen(match)">Reopen</button>
                           }
                         } @else {
@@ -165,8 +207,7 @@
                             Mark Final
                           </button>
                         }
-                      </div>
-                    }
+                    </div>
                     @if (workLabel(config, match); as work) {
                       <small>Work: {{ work }}</small>
                     }

@@ -920,14 +920,30 @@ function sanitizePlayoff(playoff) {
 }
 
 function sanitizePlayoffBracket(bracket, kind, enabled) {
+  const matches = Array.isArray(bracket?.matches)
+    ? bracket.matches.map((match) => sanitizePlayoffMatch({ ...match, bracket: kind }))
+    : [];
+  resolvePlayoffByes(matches);
   return {
     kind,
     enabled,
-    matches: Array.isArray(bracket?.matches)
-      ? bracket.matches.map((match) => sanitizePlayoffMatch({ ...match, bracket: kind }))
-      : [],
+    matches,
     championTeamId: typeof bracket?.championTeamId === 'string' ? bracket.championTeamId : null
   };
+}
+
+function resolvePlayoffByes(matches) {
+  for (const match of [...matches].sort((left, right) => left.round - right.round)) {
+    const hasBye = match.sourceA?.kind === 'bye' || match.sourceB?.kind === 'bye';
+    const onlyTeamId = match.teamAId || match.teamBId;
+    if (!hasBye || !onlyTeamId) continue;
+    match.final = true;
+    match.winnerTeamId = onlyTeamId;
+    for (const next of matches.filter((candidate) => candidate.round === match.round + 1)) {
+      if (next.sourceA?.matchId === match.id) next.teamAId = onlyTeamId;
+      if (next.sourceB?.matchId === match.id) next.teamBId = onlyTeamId;
+    }
+  }
 }
 
 function sanitizePlayoffMatch(match) {
@@ -1693,7 +1709,11 @@ function empty(response, status = 204) {
 function json(response, body, status = 200, extraHeaders = {}) {
   response.writeHead(status, {
     ...corsHeaders(),
+    'cache-control': 'no-store, max-age=0',
     'content-type': 'application/json',
+    expires: '0',
+    pragma: 'no-cache',
+    vary: 'x-admin-password',
     ...extraHeaders
   });
   response.end(JSON.stringify(body, null, 2));

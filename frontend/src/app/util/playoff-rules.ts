@@ -282,6 +282,7 @@ const resolveByes = (matches: PlayoffMatch[]): void => {
     const onlyTeam = match.teamAId || match.teamBId;
     const hasBye = match.sourceA.kind === 'bye' || match.sourceB.kind === 'bye';
     if (!hasBye || !onlyTeam) continue;
+    match.final = true;
     match.winnerTeamId = onlyTeam;
     for (const next of matches.filter((candidate) => candidate.round === match.round + 1)) {
       if (next.sourceA.matchId === match.id) next.teamAId = onlyTeam;

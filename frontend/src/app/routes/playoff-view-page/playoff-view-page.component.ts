@@ -63,6 +63,13 @@ export class PlayoffViewPageComponent implements OnInit {
     return playoffTeamName(this.scoring.event?.pools ?? [], teamId);
   }
 
+  slotName(match: PlayoffMatch, side: 'A' | 'B'): string {
+    const teamId = side === 'A' ? match.teamAId : match.teamBId;
+    if (teamId) return this.teamName(teamId);
+    const source = side === 'A' ? match.sourceA : match.sourceB;
+    return source.kind === 'bye' ? 'Bye' : source.label;
+  }
+
   workLabel(config: PlayoffConfiguration, match: PlayoffMatch): string {
     const workTeamId = playoffResolvedWorkTeamId(config, match);
     if (workTeamId) return this.teamName(workTeamId);
@@ -74,8 +81,20 @@ export class PlayoffViewPageComponent implements OnInit {
     return Boolean(this.playoff && (this.scoring.isAdmin || this.playoff.editable));
   }
 
+  canScoreMatch(match: PlayoffMatch): boolean {
+    return this.canScore() && Boolean(match.teamAId && match.teamBId) && !this.isByeMatch(match);
+  }
+
+  isByeMatch(match: PlayoffMatch): boolean {
+    return match.sourceA.kind === 'bye' || match.sourceB.kind === 'bye';
+  }
+
   hasWinner(match: PlayoffMatch): boolean {
     return Boolean(winningTeamId(match));
+  }
+
+  isWinner(match: PlayoffMatch, teamId: string | null): boolean {
+    return Boolean(match.final && teamId && match.winnerTeamId === teamId);
   }
 
   canShowSet(match: PlayoffMatch, gameIndex: number): boolean {
@@ -94,7 +113,7 @@ export class PlayoffViewPageComponent implements OnInit {
 
   updateScore(match: PlayoffMatch, gameIndex: number, side: 'A' | 'B', change: number): void {
     const game = match.games[gameIndex];
-    if (!this.canScore() || match.final || game.final) return;
+    if (!this.canScoreMatch(match) || match.final || game.final) return;
     if (side === 'A') game.scoreA = Math.max(0, game.scoreA + change);
     else game.scoreB = Math.max(0, game.scoreB + change);
     void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
@@ -102,7 +121,7 @@ export class PlayoffViewPageComponent implements OnInit {
 
   setScore(match: PlayoffMatch, gameIndex: number, side: 'A' | 'B', value: unknown): void {
     const game = match.games[gameIndex];
-    if (!this.canScore() || match.final || game.final) return;
+    if (!this.canScoreMatch(match) || match.final || game.final) return;
     const parsed = Number(value);
     const cap = this.scoreCap(match, gameIndex);
     const score = Number.isInteger(parsed) ? Math.min(cap ?? Number.MAX_SAFE_INTEGER, Math.max(0, parsed)) : 0;
@@ -151,7 +170,7 @@ export class PlayoffViewPageComponent implements OnInit {
   }
 
   reopen(match: PlayoffMatch): void {
-    if (!this.scoring.isAdmin) return;
+    if (!this.scoring.isAdmin || this.isByeMatch(match)) return;
     match.final = false;
     match.winnerTeamId = null;
     void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);

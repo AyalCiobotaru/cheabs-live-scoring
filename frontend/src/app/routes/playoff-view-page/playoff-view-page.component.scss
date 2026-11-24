@@ -9,6 +9,45 @@
   border-radius: 6px;
   padding: 14px;
 }
+.playoff-stage-title {
+  display: grid;
+  gap: 2px;
+}
+.playoff-stage-title p {
+  color: #5d6878;
+  margin: 0;
+}
+.playoff-champion {
+  align-items: flex-end;
+  background: #fff8dc;
+  border: 1px solid #d7b94e;
+  border-radius: 6px;
+  display: grid;
+  gap: 1px;
+  padding: 7px 11px;
+  text-align: right;
+}
+.playoff-champion span {
+  color: #715a00;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.playoff-champion strong {
+  color: #352900;
+  font-size: 17px;
+  font-weight: 900;
+}
+.playoff-champion.silver {
+  background: #f1f4f7;
+  border-color: #aeb8c4;
+}
+.playoff-champion.silver span {
+  color: #5d6878;
+}
+.playoff-champion.silver strong {
+  color: #26384c;
+}
 .bracket-rounds {
   display: grid;
   gap: 14px;
@@ -62,8 +101,7 @@
 .playoff-match.final {
   background: #f1f8f3;
 }
-.playoff-match-meta,
-.playoff-score-team {
+.playoff-match-meta {
   align-items: center;
   display: flex;
   gap: 7px;
@@ -74,47 +112,92 @@ small {
   color: #5d6878;
   font-size: 12px;
 }
-.playoff-games {
-  display: grid;
-  gap: 6px;
-}
-.playoff-game button {
-  padding: 5px 8px;
-}
-.playoff-game {
+.playoff-score-grid {
   border-top: 1px solid #e3e9f1;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   padding-top: 8px;
 }
-.playoff-game h5 {
-  margin: 0;
-}
-.playoff-set-heading {
+.playoff-score-header,
+.playoff-score-row,
+.playoff-set-actions {
   align-items: center;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(95px, 1fr) repeat(var(--set-count), minmax(58px, 76px));
 }
-.playoff-set-heading button {
-  padding: 5px 8px;
+.playoff-score-header {
+  color: #5d6878;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
 }
-.playoff-score-team > span {
-  flex: 1 1 auto;
-  font-weight: 700;
+.playoff-score-header span:first-child {
+  text-align: left;
+}
+.playoff-team-name {
+  font-weight: 200;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.playoff-team-name.winner {
+  font-weight: 1000;
+}
+.playoff-score-cell {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
-.playoff-score-team > input {
-  font-size: 22px;
+.playoff-score-cell > input {
+  font-size: 20px;
   font-weight: 800;
-  max-width: 72px;
-  padding: 6px;
+  min-width: 0;
+  padding: 5px 3px;
+  text-align: center;
+  width: 100%;
+}
+.playoff-score-cell.pending {
+  color: #8793a3;
   text-align: center;
 }
 .score-buttons {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+}
+.score-buttons button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 2px;
+}
+.playoff-set-actions {
+  align-items: stretch;
+}
+.playoff-set-actions button {
+  font-size: 11px;
+  padding: 5px 2px;
+}
+.playoff-match-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+.match-final-badge {
+  color: #245b34;
+  font-size: 12px;
+  text-transform: uppercase;
 }
 @media (max-width: 700px) {
+  .playoff-bracket > .section-title {
+    align-items: center;
+  }
+  .playoff-champion {
+    align-items: center;
+    box-sizing: border-box;
+    justify-self: center;
+    text-align: center;
+    width: min(100%, 280px);
+  }
   .playoff-page .event-title {
     align-items: flex-start;
     gap: 8px;
