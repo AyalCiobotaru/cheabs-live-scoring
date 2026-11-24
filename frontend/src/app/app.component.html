@@ -52,6 +52,30 @@
           <div>
             <h2>{{ scoring.event.name }}</h2>
           </div>
+        @if (scoring.selectedCategory) {
+          <div class="active-event-filter" role="status">
+            Filter: 
+            <button
+              type="button"
+              class="active-filter-chip"
+              title="Remove filter"
+              [attr.aria-label]="
+                'Remove ' +
+                scoring.selectedCategory +
+                (scoring.selectedDivision ? ' ' + scoring.selectedDivision : '') +
+                ' filter'
+              "
+              (click)="scoring.clearDivisionFilter()"
+            >
+              <span>{{ scoring.selectedCategory }}</span>
+              @if (scoring.selectedDivision) {
+                <span>{{ scoring.selectedDivision }}</span>
+              }
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        }
+        
         </div>
         <nav class="dashboard-view-toggle">
           <button
@@ -65,39 +89,20 @@
           <button
             type="button"
             class="secondary"
-            [class.active]="scoring.showingFavoritePools"
-            (click)="scoring.openFavoritePools()"
-          >
-            Favorites ({{ scoring.favoritePoolCount }})
-          </button>
-          <button
-            type="button"
-            class="secondary"
             [class.active]="showingPlayoffs"
             (click)="scoring.openPlayoffs()"
           >
             Playoffs
           </button>
+          <button
+            type="button"
+            class="secondary"
+            [class.active]="scoring.showingFavoritePools"
+            (click)="scoring.openFavoritePools()"
+          >
+            Favorites ({{ scoring.favoritePoolCount }})
+          </button>
         </nav>
-        @if (scoring.selectedCategory) {
-          <div class="active-event-filter match-summary" role="status">
-            <span>
-              Filtered to {{ scoring.selectedCategory }}
-              @if (scoring.selectedDivision) {
-                · {{ scoring.selectedDivision }}
-              }
-            </span>
-    <button
-      type="button"
-      class="filter-clear"
-      title="Clear filter"
-      aria-label="Clear category and division filter"
-      (click)="scoring.clearDivisionFilter()"
-    >
-      &times;
-    </button>
-          </div>
-        }
       </section>
     }
 

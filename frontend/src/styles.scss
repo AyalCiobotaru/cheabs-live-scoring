@@ -5,8 +5,25 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   margin: 0;
   min-height: 100%;
+  touch-action: manipulation;
 }
 
 * {
   box-sizing: border-box;
+}
+
+app-root .active-event-filter .active-filter-chip,
+app-root .active-event-filter .active-filter-chip:hover {
+  background: #eef3f8;
+  border-color: #cbd5e1;
+  color: #34465c;
+}
+
+app-root .active-event-filter .active-filter-chip {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 5px;
+  min-height: 30px;
+  padding: 7px 12px;
 }
