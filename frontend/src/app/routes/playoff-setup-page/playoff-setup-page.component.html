@@ -127,7 +127,7 @@
           <div class="match-assignments">
             @for (match of bracket.matches; track match.id) {
               <div>
-                <strong>R{{ match.round + 1 }} M{{ match.position + 1 }}</strong>
+                <strong>Round {{ match.round + 1 }} · Match {{ matchNumber(bracket, match) }}</strong>
                 @if (match.round === 0) {
                   <label
                     >Team A

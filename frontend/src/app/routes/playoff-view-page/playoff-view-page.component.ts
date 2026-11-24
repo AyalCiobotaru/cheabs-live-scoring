@@ -5,6 +5,7 @@ import { PlayoffBracket, PlayoffBracketKind, PlayoffConfiguration, PlayoffMatch 
 import { ScoringEventStateService } from '../../service/scoring-event-state.service';
 import {
   playoffResolvedWorkTeamId,
+  playoffMatchNumber,
   playoffTeamName,
   playoffWorkPlaceholder,
   winningTeamId
@@ -40,6 +41,10 @@ export class PlayoffViewPageComponent implements OnInit {
     return bracket.matches.filter((match) => match.round === round).sort((a, b) => a.position - b.position);
   }
 
+  matchNumber(bracket: PlayoffBracket, match: PlayoffMatch): number {
+    return playoffMatchNumber(bracket, match);
+  }
+
   activeMobileRound(bracket: PlayoffBracket): number {
     const availableRounds = this.rounds(bracket);
     const selectedRound = this.mobileRounds[bracket.kind];
@@ -67,7 +72,14 @@ export class PlayoffViewPageComponent implements OnInit {
     const teamId = side === 'A' ? match.teamAId : match.teamBId;
     if (teamId) return this.teamName(teamId);
     const source = side === 'A' ? match.sourceA : match.sourceB;
-    return source.kind === 'bye' ? 'Bye' : source.label;
+    if (source.kind === 'bye') return 'Bye';
+    if (source.kind === 'winner' && source.matchId && this.playoff) {
+      for (const bracket of [this.playoff.gold, this.playoff.silver]) {
+        const sourceMatch = bracket.matches.find((candidate) => candidate.id === source.matchId);
+        if (sourceMatch) return `Winner of Match ${this.matchNumber(bracket, sourceMatch)}`;
+      }
+    }
+    return source.label;
   }
 
   workLabel(config: PlayoffConfiguration, match: PlayoffMatch): string {
@@ -95,6 +107,50 @@ export class PlayoffViewPageComponent implements OnInit {
 
   isWinner(match: PlayoffMatch, teamId: string | null): boolean {
     return Boolean(match.final && teamId && match.winnerTeamId === teamId);
+  }
+
+  currentGame(match: PlayoffMatch): { index: number; game: PlayoffMatch['games'][number] } | null {
+    const activeIndex = match.games.findIndex((game, index) => this.canShowSet(match, index) && !game.final);
+    if (activeIndex >= 0) return { index: activeIndex, game: match.games[activeIndex] };
+
+    let lastFinalIndex = -1;
+    for (let index = match.games.length - 1; index >= 0; index -= 1) {
+      if (match.games[index].final) {
+        lastFinalIndex = index;
+        break;
+      }
+    }
+    const index = lastFinalIndex >= 0 ? lastFinalIndex : 0;
+    return match.games[index] ? { index, game: match.games[index] } : null;
+  }
+
+  finalizedGames(match: PlayoffMatch): PlayoffMatch['games'] {
+    return match.games.filter((game) => game.final);
+  }
+
+  isCurrentSet(match: PlayoffMatch, gameIndex: number): boolean {
+    const readyToScore = Boolean(match.teamAId && match.teamBId) && !this.isByeMatch(match);
+    return readyToScore && !match.final && this.currentGame(match)?.index === gameIndex;
+  }
+
+  canReopenCompletedSet(match: PlayoffMatch, gameIndex: number): boolean {
+    if (!this.scoring.isAdmin || this.isByeMatch(match) || !match.games[gameIndex]?.final) return false;
+    return gameIndex === this.latestFinalizedSetIndex(match);
+  }
+
+  reopenCompletedSet(match: PlayoffMatch, gameIndex: number): void {
+    if (!this.canReopenCompletedSet(match, gameIndex)) return;
+    match.final = false;
+    match.winnerTeamId = null;
+    match.games[gameIndex].final = false;
+    void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
+  }
+
+  private latestFinalizedSetIndex(match: PlayoffMatch): number {
+    for (let index = match.games.length - 1; index >= 0; index -= 1) {
+      if (match.games[index].final) return index;
+    }
+    return -1;
   }
 
   canShowSet(match: PlayoffMatch, gameIndex: number): boolean {
@@ -134,6 +190,16 @@ export class PlayoffViewPageComponent implements OnInit {
     (event.currentTarget as HTMLInputElement).blur();
   }
 
+  clearZero(event: FocusEvent, score: unknown): void {
+    const input = event.target as HTMLInputElement;
+    if (Number(score) === 0) input.value = '';
+  }
+
+  restoreZero(event: FocusEvent): void {
+    const input = event.target as HTMLInputElement;
+    if (input.value === '') input.value = '0';
+  }
+
   scoreCap(match: PlayoffMatch, gameIndex: number): number | null {
     const deciding = match.format.setsToWin > 1 && gameIndex === match.format.setsToWin * 2 - 2;
     return deciding ? match.format.decidingPointCap : match.format.pointCap;
@@ -142,12 +208,6 @@ export class PlayoffViewPageComponent implements OnInit {
   markSetFinal(match: PlayoffMatch, gameIndex: number): void {
     if (!this.canScore() || match.final || !this.canMarkSetFinal(match, gameIndex)) return;
     match.games[gameIndex].final = true;
-    void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
-  }
-
-  reopenSet(match: PlayoffMatch, gameIndex: number): void {
-    if (!this.scoring.isAdmin || match.final) return;
-    match.games[gameIndex].final = false;
     void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
   }
 
@@ -169,10 +229,4 @@ export class PlayoffViewPageComponent implements OnInit {
     void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
   }
 
-  reopen(match: PlayoffMatch): void {
-    if (!this.scoring.isAdmin || this.isByeMatch(match)) return;
-    match.final = false;
-    match.winnerTeamId = null;
-    void this.scoring.handlePlayoffMatchChanged(this.playoffId, match);
-  }
 }

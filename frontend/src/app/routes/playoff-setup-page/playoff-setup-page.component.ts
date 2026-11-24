@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { PlayoffBracket, PlayoffConfiguration, PlayoffMatch } from '../../models';
 import { ScoringEventStateService } from '../../service/scoring-event-state.service';
-import { playoffWorkPlaceholder, regeneratePlayoffConfiguration } from '../../util/playoff-rules';
+import { playoffMatchNumber, playoffWorkPlaceholder, regeneratePlayoffConfiguration } from '../../util/playoff-rules';
 
 @Component({
   selector: 'app-playoff-setup-page',
@@ -50,6 +50,10 @@ export class PlayoffSetupPageComponent implements OnInit {
 
   rounds(bracket: PlayoffBracket): number[] {
     return [...new Set(bracket.matches.map((match) => match.round))].sort((a, b) => a - b);
+  }
+
+  matchNumber(bracket: PlayoffBracket, match: PlayoffMatch): number {
+    return playoffMatchNumber(bracket, match);
   }
 
   workPlaceholder(config: PlayoffConfiguration, match: PlayoffMatch): string {

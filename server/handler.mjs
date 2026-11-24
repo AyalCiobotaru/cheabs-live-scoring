@@ -924,12 +924,26 @@ function sanitizePlayoffBracket(bracket, kind, enabled) {
     ? bracket.matches.map((match) => sanitizePlayoffMatch({ ...match, bracket: kind }))
     : [];
   resolvePlayoffByes(matches);
+  assignThreeTeamByeWorkTeam(matches);
   return {
     kind,
     enabled,
     matches,
     championTeamId: typeof bracket?.championTeamId === 'string' ? bracket.championTeamId : null
   };
+}
+
+function assignThreeTeamByeWorkTeam(matches) {
+  const openingMatches = matches.filter((match) => match.round === 0);
+  if (openingMatches.length !== 2) return;
+  const byeMatches = openingMatches.filter(
+    (match) => match.sourceA?.kind === 'bye' || match.sourceB?.kind === 'bye'
+  );
+  const playedMatches = openingMatches.filter(
+    (match) => match.sourceA?.kind !== 'bye' && match.sourceB?.kind !== 'bye'
+  );
+  if (byeMatches.length !== 1 || playedMatches.length !== 1 || playedMatches[0].workTeamId) return;
+  playedMatches[0].workTeamId = byeMatches[0].winnerTeamId;
 }
 
 function resolvePlayoffByes(matches) {

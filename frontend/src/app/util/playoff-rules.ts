@@ -99,6 +99,14 @@ export const winningTeamId = (match: PlayoffMatch): string | null => {
   return winsA > winsB ? match.teamAId : match.teamBId;
 };
 
+export const playoffMatchNumber = (bracket: PlayoffBracket, match: PlayoffMatch): number => {
+  const earlierMatches = bracket.matches.filter((candidate) => candidate.round < match.round).length;
+  const roundMatches = bracket.matches
+    .filter((candidate) => candidate.round === match.round)
+    .sort((left, right) => left.position - right.position);
+  return earlierMatches + Math.max(0, roundMatches.findIndex((candidate) => candidate.id === match.id)) + 1;
+};
+
 export const playoffWorkPlaceholder = (config: PlayoffConfiguration, match: PlayoffMatch): string => {
   const assignment = playoffWorkAssignment(config, match);
   if (!assignment) return 'None';
@@ -213,7 +221,29 @@ const buildBracket = (
     round += 1;
   }
   resolveByes(matches);
-  return { kind, enabled: true, matches, championTeamId: null };
+  assignThreeTeamByeWorkTeam(matches);
+  const bracket = { kind, enabled: true, matches, championTeamId: null };
+  refreshWinnerSourceLabels(bracket);
+  return bracket;
+};
+
+const refreshWinnerSourceLabels = (bracket: PlayoffBracket): void => {
+  for (const match of bracket.matches) {
+    for (const source of [match.sourceA, match.sourceB]) {
+      if (source.kind !== 'winner' || !source.matchId) continue;
+      const sourceMatch = bracket.matches.find((candidate) => candidate.id === source.matchId);
+      if (sourceMatch) source.label = `Winner of Match ${playoffMatchNumber(bracket, sourceMatch)}`;
+    }
+  }
+};
+
+const assignThreeTeamByeWorkTeam = (matches: PlayoffMatch[]): void => {
+  const openingMatches = matches.filter((match) => match.round === 0);
+  if (openingMatches.length !== 2) return;
+  const byeMatches = openingMatches.filter(isByeMatch);
+  const playedMatches = openingMatches.filter((match) => !isByeMatch(match));
+  if (byeMatches.length !== 1 || playedMatches.length !== 1 || playedMatches[0].workTeamId) return;
+  playedMatches[0].workTeamId = byeMatches[0].winnerTeamId;
 };
 
 const participantSources = (pools: PoolState[], finishes: number[], reseed: boolean): PlayoffSlotSource[] => {

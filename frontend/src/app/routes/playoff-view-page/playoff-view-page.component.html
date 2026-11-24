@@ -63,141 +63,139 @@
           <div class="bracket-rounds">
             @for (round of rounds(bracket); track round) {
               <section class="bracket-round" [class.mobile-active]="activeMobileRound(bracket) === round">
-                <h4>{{ round === rounds(bracket).length - 1 ? 'Final' : 'Round ' + (round + 1) }}</h4>
+                <h4 class="bracket-round-heading">
+                  {{ round === rounds(bracket).length - 1 ? 'Final' : 'Round ' + (round + 1) }}
+                </h4>
                 @for (match of matches(bracket, round); track match.id) {
                   <article class="playoff-match" [class.final]="match.final">
                     @if (round !== rounds(bracket).at(-1)) {
                       <span class="bracket-connector" aria-hidden="true"></span>
                     }
                     <div class="playoff-match-meta">
-                      <span>Match {{ match.position + 1 }}</span>
+                      <span>Match {{ matchNumber(bracket, match) }}</span>
                       @if (match.courtNumber) {
                         <span>Court {{ match.courtNumber }}</span>
                       }
                     </div>
-                    <div class="playoff-score-grid" [style.--set-count]="match.games.length">
-                        <div class="playoff-score-header">
-                          <span>Team</span>
-                          @for (game of match.games; track $index) {
-                            <span>Set {{ $index + 1 }}</span>
-                          }
-                        </div>
-                        <div class="playoff-score-row">
-                          <span class="playoff-team-name" [class.winner]="isWinner(match, match.teamAId)">
-                            {{ slotName(match, 'A') }}
-                          </span>
-                          @for (game of match.games; track $index; let gameIndex = $index) {
-                            @if (canShowSet(match, gameIndex)) {
-                              <div class="playoff-score-cell">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  [max]="scoreCap(match, gameIndex)"
-                                  [attr.aria-label]="slotName(match, 'A') + ' score for set ' + (gameIndex + 1)"
-                                  [ngModel]="game.scoreA"
-                                  (wheel)="disableScoreWheel($event)"
-                                  (ngModelChange)="setScore(match, gameIndex, 'A', $event)"
-                                  [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                />
-                                <div class="score-buttons">
-                                  <button
-                                    type="button"
-                                    (click)="updateScore(match, gameIndex, 'A', -1)"
-                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                  >
-                                    −
-                                  </button>
-                                  <button
-                                    type="button"
-                                    (click)="updateScore(match, gameIndex, 'A', 1)"
-                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
+                    @if (!isByeMatch(match) && (!match.final || scoring.isAdmin)) {
+                      <div class="playoff-set-history" aria-label="Set history">
+                        @for (game of match.games; track $index; let gameIndex = $index) {
+                          @if (game.final) {
+                            @if (canReopenCompletedSet(match, gameIndex)) {
+                              <button
+                                type="button"
+                                class="set-history-chip completed reopenable"
+                                title="Reopen this set"
+                                (click)="reopenCompletedSet(match, gameIndex)"
+                              >
+                                Set {{ gameIndex + 1 }}: {{ game.scoreA }}–{{ game.scoreB }} ↶
+                              </button>
                             } @else {
-                              <span class="playoff-score-cell pending">—</span>
+                              <span class="set-history-chip completed">
+                                Set {{ gameIndex + 1 }}: {{ game.scoreA }}–{{ game.scoreB }}
+                              </span>
                             }
+                          } @else if (isCurrentSet(match, gameIndex)) {
+                            <span class="set-history-chip current">Set {{ gameIndex + 1 }} · Live</span>
+                          } @else {
+                            <span class="set-history-chip upcoming">Set {{ gameIndex + 1 }}</span>
                           }
-                        </div>
-                        <div class="playoff-score-row">
-                          <span class="playoff-team-name" [class.winner]="isWinner(match, match.teamBId)">
-                            {{ slotName(match, 'B') }}
-                          </span>
-                          @for (game of match.games; track $index; let gameIndex = $index) {
-                            @if (canShowSet(match, gameIndex)) {
-                              <div class="playoff-score-cell">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  [max]="scoreCap(match, gameIndex)"
-                                  [attr.aria-label]="slotName(match, 'B') + ' score for set ' + (gameIndex + 1)"
-                                  [ngModel]="game.scoreB"
-                                  (wheel)="disableScoreWheel($event)"
-                                  (ngModelChange)="setScore(match, gameIndex, 'B', $event)"
-                                  [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                />
-                                <div class="score-buttons">
-                                  <button
-                                    type="button"
-                                    (click)="updateScore(match, gameIndex, 'B', -1)"
-                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                  >
-                                    −
-                                  </button>
-                                  <button
-                                    type="button"
-                                    (click)="updateScore(match, gameIndex, 'B', 1)"
-                                    [disabled]="!canScoreMatch(match) || match.final || game.final"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                            } @else {
-                              <span class="playoff-score-cell pending">—</span>
-                            }
-                          }
-                        </div>
-                        @if (!match.final) {
-                          <div class="playoff-set-actions">
-                          <span></span>
-                          @for (game of match.games; track $index; let gameIndex = $index) {
-                            @if (canShowSet(match, gameIndex)) {
-                              @if (game.final && scoring.isAdmin) {
-                                <button
-                                  type="button"
-                                  class="secondary"
-                                  (click)="reopenSet(match, gameIndex)"
-                                  [disabled]="match.final"
-                                  [title]="match.final ? 'Reopen the match before reopening a set.' : 'Reopen set'"
-                                >
-                                  Reopen
-                                </button>
-                              } @else if (!game.final) {
-                                <button
-                                  type="button"
-                                  class="secondary"
-                                  (click)="markSetFinal(match, gameIndex)"
-                                  [disabled]="!canScore() || !canMarkSetFinal(match, gameIndex)"
-                                >
-                                  Set final
-                                </button>
-                              }
-                            } @else {
-                              <span></span>
-                            }
-                          }
-                          </div>
                         }
-                    </div>
+                      </div>
+                    }
+                    @if (match.final) {
+                      <div class="playoff-final-score">
+                        <div class="playoff-final-team" [class.winner]="isWinner(match, match.teamAId)">
+                          <span>{{ slotName(match, 'A') }}</span>
+                          <div class="playoff-final-sets">
+                            @for (game of finalizedGames(match); track $index) {
+                              <strong>{{ game.scoreA }}</strong>
+                            } @empty {
+                              <strong>—</strong>
+                            }
+                          </div>
+                        </div>
+                        <div class="playoff-final-team" [class.winner]="isWinner(match, match.teamBId)">
+                          <span>{{ slotName(match, 'B') }}</span>
+                          <div class="playoff-final-sets">
+                            @for (game of finalizedGames(match); track $index) {
+                              <strong>{{ game.scoreB }}</strong>
+                            } @empty {
+                              <strong>—</strong>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    } @else if (currentGame(match); as current) {
+                      <div class="playoff-live-score">
+                        <strong class="playoff-current-set">Set {{ current.index + 1 }}</strong>
+                        <div class="playoff-live-team">
+                          <div class="playoff-live-team-copy">
+                            <span>{{ slotName(match, 'A') }}</span>
+                          </div>
+                          <div class="playoff-current-score">
+                            <input
+                              type="number"
+                              min="0"
+                              [max]="scoreCap(match, current.index)"
+                              [attr.aria-label]="slotName(match, 'A') + ' score for set ' + (current.index + 1)"
+                              [ngModel]="current.game.scoreA"
+                              (focus)="clearZero($event, current.game.scoreA)"
+                              (blur)="restoreZero($event)"
+                              (wheel)="disableScoreWheel($event)"
+                              (ngModelChange)="setScore(match, current.index, 'A', $event)"
+                              [disabled]="!canScoreMatch(match) || current.game.final"
+                            />
+                            @if (canScoreMatch(match) && !current.game.final) {
+                              <div class="playoff-score-buttons">
+                                <button type="button" (click)="updateScore(match, current.index, 'A', -1)">−</button>
+                                <button type="button" (click)="updateScore(match, current.index, 'A', 1)">+</button>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                        <div class="playoff-live-team">
+                          <div class="playoff-live-team-copy">
+                            <span>{{ slotName(match, 'B') }}</span>
+                          </div>
+                          <div class="playoff-current-score">
+                            <input
+                              type="number"
+                              min="0"
+                              [max]="scoreCap(match, current.index)"
+                              [attr.aria-label]="slotName(match, 'B') + ' score for set ' + (current.index + 1)"
+                              [ngModel]="current.game.scoreB"
+                              (focus)="clearZero($event, current.game.scoreB)"
+                              (blur)="restoreZero($event)"
+                              (wheel)="disableScoreWheel($event)"
+                              (ngModelChange)="setScore(match, current.index, 'B', $event)"
+                              [disabled]="!canScoreMatch(match) || current.game.final"
+                            />
+                            @if (canScoreMatch(match) && !current.game.final) {
+                              <div class="playoff-score-buttons">
+                                <button type="button" (click)="updateScore(match, current.index, 'B', -1)">−</button>
+                                <button type="button" (click)="updateScore(match, current.index, 'B', 1)">+</button>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                        <div class="playoff-current-set-action">
+                          @if (!current.game.final) {
+                            <button
+                              type="button"
+                              class="secondary"
+                              (click)="markSetFinal(match, current.index)"
+                              [disabled]="!canScoreMatch(match) || !canMarkSetFinal(match, current.index)"
+                            >
+                              Set final
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
                     <div class="row-actions playoff-match-actions">
                         @if (match.final) {
                           <strong class="match-final-badge">Final</strong>
-                          @if (scoring.isAdmin && !isByeMatch(match)) {
-                            <button type="button" class="secondary" (click)="reopen(match)">Reopen</button>
-                          }
                         } @else {
                           <button
                             type="button"
