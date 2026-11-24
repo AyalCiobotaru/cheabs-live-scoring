@@ -10,7 +10,7 @@
         [selectedDivision]="scoring.selectedDivision"
         [showingFavoritePools]="scoring.showingFavoritePools"
         [divisionOptions]="scoring.divisionFilterOptions"
-        (poolsSelected)="scoring.openDashboard()"
+        (poolsSelected)="scoring.openEventOverview()"
         (favoritesSelected)="scoring.openFavoritePools()"
         (playoffsSelected)="scoring.openPlayoffs()"
         (divisionPlayoffsSelected)="scoring.openPlayoffs($event.category, $event.division)"
@@ -45,6 +45,61 @@
         }
       </div>
     </header>
+
+    @if (scoring.event) {
+      <section class="setup-panel" aria-label="Event navigation">
+        <div class="event-title">
+          <div>
+            <h2>{{ scoring.event.name }}</h2>
+          </div>
+        </div>
+        <nav class="dashboard-view-toggle">
+          <button
+            type="button"
+            class="secondary"
+            [class.active]="!scoring.showingFavoritePools && !showingPlayoffs"
+            (click)="scoring.openDashboard()"
+          >
+            All pools
+          </button>
+          <button
+            type="button"
+            class="secondary"
+            [class.active]="scoring.showingFavoritePools"
+            (click)="scoring.openFavoritePools()"
+          >
+            Favorites ({{ scoring.favoritePoolCount }})
+          </button>
+          <button
+            type="button"
+            class="secondary"
+            [class.active]="showingPlayoffs"
+            (click)="scoring.openPlayoffs()"
+          >
+            Playoffs
+          </button>
+        </nav>
+        @if (scoring.selectedCategory) {
+          <div class="active-event-filter match-summary" role="status">
+            <span>
+              Filtered to {{ scoring.selectedCategory }}
+              @if (scoring.selectedDivision) {
+                · {{ scoring.selectedDivision }}
+              }
+            </span>
+    <button
+      type="button"
+      class="filter-clear"
+      title="Clear filter"
+      aria-label="Clear category and division filter"
+      (click)="scoring.clearDivisionFilter()"
+    >
+      &times;
+    </button>
+          </div>
+        }
+      </section>
+    }
 
     @if (scoring.sideSwitchToast) {
       <aside class="side-switch-toast" role="status" aria-live="polite">

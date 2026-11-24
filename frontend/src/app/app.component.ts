@@ -35,11 +35,18 @@ export class AppComponent implements OnInit, OnDestroy {
     this.scoring.destroy();
   }
 
+  get showingPlayoffs(): boolean {
+    return this.router.url.split('?')[0].includes('/playoffs');
+  }
+
   private async loadEventFromRoute(): Promise<void> {
     const eventCode = this.findEventCode();
 
     if (eventCode) {
       await this.scoring.loadEvent(eventCode);
+      const params = this.router.routerState.snapshot.root.queryParamMap;
+      this.scoring.setFavoritePoolsFromRoute(params.get('favorites') === '1');
+      this.scoring.setSelectedDivisionFromRoute(params.get('category'), params.get('division'));
     }
   }
 

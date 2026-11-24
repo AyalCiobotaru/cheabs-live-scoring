@@ -1,9 +1,10 @@
 <span hidden>{{ scoring.version() }}</span>
 @if (playoff; as config) {
   <section class="event-dashboard playoff-page">
-    <div class="event-title">
+    <div class="section-title playoff-stage-title">
       <div>
-        <h2>{{ scoring.event?.name }}</h2>
+        <p>{{ config.category }} · {{ config.division }}</p>
+        <h2>Playoffs</h2>
       </div>
       <div class="header-actions">
         @if (scoring.isAdmin) {
@@ -11,19 +12,6 @@
           <button type="button" class="danger" (click)="scoring.deletePlayoff(config.id)">Delete</button>
         }
       </div>
-    </div>
-
-    <div class="dashboard-view-toggle">
-      <button type="button" class="secondary" (click)="scoring.openDashboard()">All pools</button>
-      <button type="button" class="secondary" (click)="scoring.openFavoritePools()">
-        Favorites ({{ scoring.favoritePoolCount }})
-      </button>
-      <button type="button" class="secondary active" (click)="scoring.openPlayoffs()">Playoffs</button>
-    </div>
-
-    <div class="playoff-stage-title">
-      <p>{{ config.category }} · {{ config.division }}</p>
-      <h2>Playoffs</h2>
     </div>
 
     @for (bracket of [config.gold, config.silver]; track bracket.kind) {

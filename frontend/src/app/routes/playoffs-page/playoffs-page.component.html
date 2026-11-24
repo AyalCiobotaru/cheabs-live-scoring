@@ -1,23 +1,11 @@
 <span hidden>{{ scoring.version() }}</span>
 <section class="event-dashboard">
-  <div class="event-title">
-    <div>
-      <h2>{{ scoring.event?.name }}</h2>
-    </div>
+  <div class="section-title">
+    <h2>Playoffs</h2>
     @if (scoring.isAdmin) {
       <button type="button" (click)="scoring.startPlayoffSetup()">Add playoffs</button>
     }
   </div>
-
-  <div class="dashboard-view-toggle">
-    <button type="button" class="secondary" (click)="scoring.openDashboard()">All pools</button>
-    <button type="button" class="secondary" (click)="scoring.openFavoritePools()">
-      Favorites ({{ scoring.favoritePoolCount }})
-    </button>
-    <button type="button" class="secondary active" (click)="scoring.openPlayoffs()">Playoffs</button>
-  </div>
-
-  <h2>Playoffs</h2>
 
   @if (playoffs.length) {
     <div class="pool-grid">

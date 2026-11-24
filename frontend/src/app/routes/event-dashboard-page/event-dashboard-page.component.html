@@ -1,17 +1,12 @@
 <span hidden>{{ scoring.version() }}</span>
 @if (scoring.event) {
   <app-event-dashboard
-    [event]="scoring.event"
     [isAdmin]="scoring.isAdmin"
     [poolCards]="scoring.poolCards"
     [visibleCategoryPoolGroups]="scoring.visibleCategoryPoolGroups"
     [favoritePoolIds]="scoring.favoritePoolIdList"
     [showingFavoritePools]="scoring.showingFavoritePools"
-    [favoritePoolCount]="scoring.favoritePoolCount"
     (addPool)="scoring.startAddPool()"
-    (allPoolsSelected)="scoring.openDashboard()"
-    (favoritesSelected)="scoring.openFavoritePools()"
-    (playoffsSelected)="scoring.openPlayoffs()"
     (poolFavoriteToggled)="scoring.togglePoolFavorite($event)"
     (poolSelected)="scoring.openPool($event)"
     (timerSelected)="scoring.openPoolTimer($event)"

@@ -162,6 +162,19 @@ h4 {
   gap: 16px;
 }
 
+.filter-clear,
+.filter-clear:hover {
+  background: none;
+}
+
+.filter-clear {
+  border: 0;
+  color: #c00;
+  font-size: 1.5em;
+  padding: 0;
+  vertical-align: middle;
+}
+
 .dashboard-view-toggle {
   display: flex;
   flex-wrap: wrap;
@@ -341,14 +354,11 @@ h4 {
 
 .setup-panel,
 .scoreboard {
-  background: #ffffff;
-  border: 1px solid #d8e0ea;
   border-radius: 6px;
   box-sizing: border-box;
   display: grid;
   gap: 14px;
   min-width: 0;
-  padding: 16px;
 }
 
 .teams-panel,

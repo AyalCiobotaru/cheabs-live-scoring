@@ -21,10 +21,7 @@ export class EventDashboardPageComponent implements OnInit, OnDestroy {
     this.querySubscription = this.route.queryParamMap.subscribe((params) => {
       const showingFavorites = params.get('favorites') === '1';
       this.scoring.setFavoritePoolsFromRoute(showingFavorites);
-      this.scoring.setSelectedDivisionFromRoute(
-        showingFavorites ? null : params.get('category'),
-        showingFavorites ? null : params.get('division')
-      );
+      this.scoring.setSelectedDivisionFromRoute(params.get('category'), params.get('division'));
     });
   }
 

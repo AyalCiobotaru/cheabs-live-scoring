@@ -452,21 +452,53 @@ export class ScoringEventStateService {
     this.draftPool = null;
     this.expandedMatchId = null;
     this.showingFavoritePools = false;
+    void this.router.navigate(['/events', this.event.code], { queryParams: this.filterQueryParams() });
+    this.bump();
+  }
+
+  openEventOverview(): void {
+    if (!this.event) return;
     this.selectedCategory = null;
     this.selectedDivision = null;
+    this.showingFavoritePools = false;
+    this.draftPool = null;
+    this.expandedMatchId = null;
     void this.router.navigate(['/events', this.event.code]);
     this.bump();
   }
 
+  clearDivisionFilter(): void {
+    this.selectedCategory = null;
+    this.selectedDivision = null;
+    const [path, query = ''] = this.router.url.split('?');
+    const queryParams = new URLSearchParams(query);
+    queryParams.delete('category');
+    queryParams.delete('division');
+    const remainingQuery = queryParams.toString();
+    void this.router.navigateByUrl(remainingQuery ? `${path}?${remainingQuery}` : path);
+    this.bump();
+  }
+
   openPlayoffs(category?: string, division?: string): void {
-    if (this.event)
+    if (this.event) {
+      const selectedCategory = category ? normalizePoolCategory(category) : this.selectedCategory;
+      const selectedDivision = division ? normalizeDivision(division) : this.selectedDivision;
+      if (category) {
+        this.selectedCategory = selectedCategory;
+        this.selectedDivision = division ? selectedDivision : null;
+      }
       void this.router.navigate(['/events', this.event.code, 'playoffs'], {
-        queryParams: category && division ? { category, division } : {}
+        queryParams: this.filterQueryParams()
       });
+      this.bump();
+    }
   }
 
   openPlayoff(playoffId: string): void {
-    if (this.event) void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId]);
+    if (this.event)
+      void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId], {
+        queryParams: this.filterQueryParams()
+      });
   }
 
   startPlayoffSetup(category?: string, division?: string): void {
@@ -475,7 +507,9 @@ export class ScoringEventStateService {
     const selectedDivision = normalizeDivision(division ?? this.selectedDivision ?? this.divisionOptions[0]);
     const pools = this.playoffPools(selectedCategory, selectedDivision);
     this.draftPlayoff = createPlayoffConfiguration(selectedCategory, selectedDivision, pools);
-    void this.router.navigate(['/events', this.event.code, 'playoffs', this.draftPlayoff.id, 'setup']);
+    void this.router.navigate(['/events', this.event.code, 'playoffs', this.draftPlayoff.id, 'setup'], {
+      queryParams: this.filterQueryParams()
+    });
   }
 
   editPlayoff(playoffId: string): void {
@@ -483,7 +517,9 @@ export class ScoringEventStateService {
     const playoff = this.event.playoffs.find((candidate) => candidate.id === playoffId);
     if (!playoff) return;
     this.draftPlayoff = this.clonePlayoff(playoff);
-    void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId, 'setup']);
+    void this.router.navigate(['/events', this.event.code, 'playoffs', playoffId, 'setup'], {
+      queryParams: this.filterQueryParams()
+    });
   }
 
   regenerateDraftPlayoff(): void {
@@ -513,7 +549,9 @@ export class ScoringEventStateService {
     const id = this.draftPlayoff.id;
     this.draftPlayoff = null;
     this.persistLocal();
-    await this.router.navigate(['/events', this.event.code, 'playoffs', id]);
+    await this.router.navigate(['/events', this.event.code, 'playoffs', id], {
+      queryParams: this.filterQueryParams()
+    });
     this.bump();
   }
 
@@ -535,7 +573,9 @@ export class ScoringEventStateService {
       if (key.startsWith(`${playoffId}:`)) this.playoffWriteQueues.delete(key);
     }
     this.persistLocal();
-    await this.router.navigate(['/events', this.event.code, 'playoffs']);
+    await this.router.navigate(['/events', this.event.code, 'playoffs'], {
+      queryParams: this.filterQueryParams()
+    });
     this.bump();
   }
 
@@ -591,7 +631,9 @@ export class ScoringEventStateService {
     this.draftPool = null;
     this.expandedMatchId = null;
     this.persistLocal();
-    void this.router.navigate(['/events', this.event.code, 'pools', poolId]);
+    void this.router.navigate(['/events', this.event.code, 'pools', poolId], {
+      queryParams: this.filterQueryParams()
+    });
     this.bump();
   }
 
@@ -630,24 +672,16 @@ export class ScoringEventStateService {
     }
 
     this.showingFavoritePools = true;
-    this.selectedCategory = null;
-    this.selectedDivision = null;
     this.draftPool = null;
     this.expandedMatchId = null;
     void this.router.navigate(['/events', this.event.code], {
-      queryParams: { favorites: '1' }
+      queryParams: { favorites: '1', ...this.filterQueryParams() }
     });
     this.bump();
   }
 
   setFavoritePoolsFromRoute(showingFavorites: boolean): void {
     this.showingFavoritePools = showingFavorites;
-
-    if (showingFavorites) {
-      this.selectedCategory = null;
-      this.selectedDivision = null;
-    }
-
     this.bump();
   }
 
@@ -2020,6 +2054,15 @@ export class ScoringEventStateService {
 
   private isNewer(left: string | null, right: string | null): boolean {
     return Date.parse(left ?? '') > Date.parse(right ?? '');
+  }
+
+  private filterQueryParams(): Record<string, string> {
+    return this.selectedCategory
+      ? {
+          category: this.selectedCategory,
+          ...(this.selectedDivision ? { division: this.selectedDivision } : {})
+        }
+      : {};
   }
 
   private localEventKey(code: string): string {
